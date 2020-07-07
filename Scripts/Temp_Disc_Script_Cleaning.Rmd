@@ -178,40 +178,6 @@ write.csv(df, "C:/Users/jacob.derosa/Desktop/Scripts/temp_disc_df.csv")
   
 ```
 
-
-```{r}
-library(missForest)
-CBCL.imp <- missForest(CBCL_r8[,2:113])
-#Temp_Disc = cbind(Temp_Disc, temp.imp$ximp)
-
-library(paran)
-
-paran(CBCL_r8[,2:113], graph = T)
-
-#paran(Temp_Disc[,2:7], graph = T)
-
-#paran(Temp_Disc[,8:13], graph = T)
-
-ncomp <- 14
-
-pca_cbcl_rotated <- psych::principal(CBCL_r8[, c(2:113)], nfactors=ncomp, scores=TRUE)
-
-#pca_mdt_rotated <- psych::principal(Temp_Disc[,8:13], 
-#                                    rotate="oblimin", nfactors=ncomp, scores=TRUE)
-
-pca_cbcl_rotated_scores <- data.frame(pca_cbcl_rotated$scores)  # Scores returned by principal()
-
-pca_cbcl_rotated$loadings
-
-pca_cbcl_rotated_scores$URSI <- CBCL_r8$URSI
-
-#Temp_Disc = Temp_Disc[,c(1,8:13)]
-
-detach("package:paran", unload = TRUE)
-
-
-```
-
 ```{r}
 
 CBCL_Subs = CBCL_r8 %>%
