@@ -1,0 +1,227 @@
+---
+title: "Scipt Cleaning"
+author: "Jacob DeRosa"
+date: "5/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = F}
+#load libraries 
+library(pander)
+require(car)
+require(dplyr) 
+require(ggplot2) 
+require(sjstats) 
+require(broom) 
+require(emmeans) 
+library(CGPfunctions)
+library(tidyr)
+library(psych)
+
+
+findOutlier <- function(data, cutoff = 3) {
+    ## Calculate the sd
+    sds <- apply(data, 2, sd, na.rm = TRUE)
+    ## Identify the cells with value greater than cutoff * sd (column wise)
+    result <- mapply(function(d, s) {
+        which(d > cutoff * s)
+    }, data, sds)
+    result
+}
+
+removeOutlier <- function(data, outliers) {
+    result <- mapply(function(d, o) {
+        res <- d
+        res[o] <- NA
+        return(res)
+    }, data, outliers)
+    return(as.data.frame(result))
+}
+
+
+```
+
+```{r, echo = F}
+#import data 
+Diagnosis <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Diagnosis.csv", header = T, sep = ",")
+
+CBCL_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/CBCL_r8.csv", header =T, sep = ",")
+
+Temp_Disc_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Temp_Disc_r8.csv", header =T, sep = ",")
+
+Basic_Demos_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Basic_Demos_r8.csv", header =T, sep = ",")
+
+
+
+
+```
+
+```{r}
+
+Temp_Disc <- Temp_Disc_r8 %>%
+  select(URSI, ends_with("_ed50")) %>%
+  rename(R_10 = Temp_Disc_run1_ed50) %>%
+  rename(R_1000 = Temp_Disc_run2_ed50) %>%
+  rename(R_1_Mil = Temp_Disc_run3_ed50) %>%
+  rename(R_1000_Past = Temp_Disc_run4_ed50) %>%
+  rename(R_1000_Exp_0 = Temp_Disc_run5_ed50) %>%
+  rename(R_Snack = Temp_Disc_run6_ed50) %>%
+  na.omit(.)
+
+Temp_Disc[,2:7] <- log(Temp_Disc[,2:7]) 
+
+#Temp_Disc = Temp_Disc[which(rowMeans(!is.na(Temp_Disc)) > 0.5), ]
+
+```
+
+# Imputation
+```{r}
+#library(missForest)
+#temp.imp <- missForest(Temp_Disc[,2:7], maxiter = 20, ntree = 300)
+#Temp_Disc = cbind(Temp_Disc, temp.imp$ximp)
+```
+
+```{r}
+
+#Time = Temp_Disc_r8 %>%
+#  select(URSI, ends_with("_RT")) %>%
+#  na.omit(.)
+
+#Time[,2:31] <- sapply(Time[,2:31], as.numeric )
+
+#Time = Time %>% 
+#  mutate(Run1 = rowSums(.[,c(2:31)], na.rm = T)) %>%
+#  select(URSI, starts_with("Run"))
+
+#outliers <- findOutlier(Time[,2, drop = F])
+
+#Time_Filt <- removeOutlier(Time[,2, drop = F], outliers)
+
+#Time_Filt = Time_Filt %>% 
+#  cbind("URSI" = Time$URSI) %>%
+#  na.omit(.)
+
+#Time_Filt = Time_Filt[, c(1, 45)] 
+
+#Temp_Disc = merge(Temp_Disc, Time_Filt, by=c("URSI"))
+
+```
+
+```{r}
+
+library(paran)
+
+#paran(Temp_Disc[,8:13], graph = T)
+#paran(Temp_Disc[,2:7], graph = T)
+
+#paran(Temp_Disc[,8:13], graph = T)
+
+ncomp <- 2
+
+pca_mdt_rotated <- psych::principal(Temp_Disc[, c("R_10", "R_1000", "R_1_Mil", "R_1000_Exp_0", "R_1000_Past", "R_Snack")], rotate="oblimin", nfactors=ncomp, scores=TRUE)
+
+#pca_mdt_rotated <- psych::principal(Temp_Disc[,8:13], 
+#                                    rotate="oblimin", nfactors=ncomp, scores=TRUE)
+
+pca_mdt_rotated_scores <- data.frame(pca_mdt_rotated$scores)  # Scores returned by principal()
+
+pca_mdt_rotated$loadings
+
+pca_mdt_rotated_scores$URSI <- Temp_Disc$URSI
+
+#Temp_Disc = Temp_Disc[,c(1,8:13)]
+
+Temp_Disc = merge(Temp_Disc, pca_mdt_rotated_scores, by=c("URSI"))
+
+detach("package:paran", unload = TRUE)
+detach("package:MASS", unload = TRUE)
+
+```
+
+```{r}
+
+Demos_Age <- Basic_Demos_r8 %>%
+  select(URSI, Age, Sex) %>%
+  rename(Ages = Age)
+
+```
+
+```{r}
+
+df = merge(Diagnosis, Temp_Disc, by = c("URSI"))
+df = merge(Demos_Age, df, by = c("URSI"))
+
+df <- df %>%
+  rename(ADHD = `Attention.Deficit.Hyperactivity.Disorder`) %>%
+  rename(ANX = `Anxiety.Disorders`) %>%
+  rename(ASD = `Autism.Spectrum.Disorder`) %>%
+  rename(DEP = `Depressive.Disorders`) %>%
+  rename(NT = `No.Diagnosis.Given`) %>%
+  rename(LD = Learning_Disorder) %>%
+  rename(ADHD_C = ADHD.Combined.Type) %>%
+  rename(ADHD_I = ADHD.Inattentive.Type) %>%
+  rename(ADHD_H = ADHD.Hyperactive.Impulsive.Type) %>%
+  rename(ODD = Oppositional.Defiant.Disorder) %>% 
+  mutate(ADHD_C_NA = ifelse(ADHD_C == 1 & ASD != 1, "1", "0")) %>%
+  mutate(ADHD_I_NA = ifelse(ADHD_I == 1 & ASD != 1, "1", "0"))%>% 
+  mutate(ASD_NA = ifelse(ADHD_C != 1 & ASD == 1 & ADHD_I !=1, "1", "0")) %>% 
+  mutate(ADHD_C_ASD = ifelse(ADHD_C == 1 & ASD == 1, "1", "0")) %>% 
+  mutate(ADHD_I_ASD = ifelse(ADHD_I == 1 & ASD == 1, "1", "0")) %>%
+  select(-X, -starts_with("Specific"))
+
+
+write.csv(df, "C:/Users/jacob.derosa/Desktop/Scripts/temp_disc_df.csv")
+  
+```
+
+
+```{r}
+library(missForest)
+CBCL.imp <- missForest(CBCL_r8[,2:113])
+#Temp_Disc = cbind(Temp_Disc, temp.imp$ximp)
+
+library(paran)
+
+paran(CBCL_r8[,2:113], graph = T)
+
+#paran(Temp_Disc[,2:7], graph = T)
+
+#paran(Temp_Disc[,8:13], graph = T)
+
+ncomp <- 14
+
+pca_cbcl_rotated <- psych::principal(CBCL_r8[, c(2:113)], nfactors=ncomp, scores=TRUE)
+
+#pca_mdt_rotated <- psych::principal(Temp_Disc[,8:13], 
+#                                    rotate="oblimin", nfactors=ncomp, scores=TRUE)
+
+pca_cbcl_rotated_scores <- data.frame(pca_cbcl_rotated$scores)  # Scores returned by principal()
+
+pca_cbcl_rotated$loadings
+
+pca_cbcl_rotated_scores$URSI <- CBCL_r8$URSI
+
+#Temp_Disc = Temp_Disc[,c(1,8:13)]
+
+detach("package:paran", unload = TRUE)
+
+
+```
+
+```{r}
+
+CBCL_Subs = CBCL_r8 %>%
+  select(URSI, ends_with("_T"))
+
+CBCL_Subs = merge(CBCL_Subs, df, by = c("URSI")) %>% 
+  select(URSI, ends_with("_T"), ANX, ASD, ADHD_C, ADHD_I, ADHD_H, ODD, Other, LD, NT, DEP, Ages, Sex) 
+
+
+write.csv(CBCL_Subs, "C:/Users/jacob.derosa/Desktop/Scripts/CBCL_Split_Data/CBCL_subs.csv")
+
+```
+
