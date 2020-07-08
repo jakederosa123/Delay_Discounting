@@ -48,7 +48,8 @@ CBCL = CBCL %>% inner_join(Diagnosis) %>% inner_join(Basic_Demos)
 
 ```{r}
 
-set.seed(1574)
+set.seed(1590)
+
 
 smp_siz = floor(0.50*nrow(CBCL[,13:25])) #columns you want to split
 
