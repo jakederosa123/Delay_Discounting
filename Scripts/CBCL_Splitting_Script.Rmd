@@ -39,19 +39,17 @@ CBCL <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/CBCL_Split_Data/CBCL_sub
 Temp_Disc = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_df.csv", header =T, sep = ",") %>% select(URSI, ends_with("_T"))
 
 CBCL = CBCL %>% inner_join(Diagnosis) %>% inner_join(Basic_Demos)
-
-# impoart
-#write.csv(CBCL, "C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/CBCL.csv")
+#CBCL$Ages = floor(CBCL$Age)
 
 
 ```
 
 ```{r}
 
-set.seed(1590)
+set.seed(99192)
 
 
-smp_siz = floor(0.50*nrow(CBCL[,13:25])) #columns you want to split
+smp_siz = floor(0.50*nrow(CBCL[,c(13:25)])) #columns you want to split
 
 train_ind = sample(seq_len(nrow(CBCL)),size = smp_siz)  # Randomly identifies the rows equal to sample size ( defined in previous instruction) 
 
@@ -70,7 +68,6 @@ print(chisq.test(rbind(table(List[[1]]$NT), table(List[[2]]$NT))))
 print(chisq.test(rbind(table(List[[1]]$LD), table(List[[2]]$LD))))
 print(chisq.test(rbind(table(List[[1]]$ADHD_C), table(List[[2]]$ADHD_C))))
 print(chisq.test(rbind(table(List[[1]]$ADHD_I), table(List[[2]]$ADHD_I))))
-print(chisq.test(rbind(table(List[[1]]$ADHD_H), table(List[[2]]$ADHD_H))))
 print(chisq.test(rbind(table(List[[1]]$ODD), table(List[[2]]$ODD))))
 print(chisq.test(rbind(table(List[[1]]$Other), table(List[[2]]$Other))))
 print(t.test(List[[1]]$Age, List[[2]]$Age))
