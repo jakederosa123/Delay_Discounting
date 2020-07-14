@@ -17,6 +17,9 @@ library(itsadug)
 library(ggplot2)
 ```
 
+Factor 1: High Reward 
+Factor : Snack 
+Factor 3: Small/Medium Reward 
 ```{r}
 
 df = read.csv("/Users/jacob.derosa/Desktop/Scripts/temp_disc_df.csv", header = T, sep = ",") %>% mutate(Sex = ifelse(Sex == 1, "Female", "Male")) %>% mutate(Sex = as.factor(Sex))
@@ -43,53 +46,20 @@ adhd_combined_nt <- df %>%
   mutate(Group = as.factor(Group)) %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
-model = gam(TC1 ~ Group + s(Ages, by = Group, bs = "ts"), method = "ML", data = adhd_combined_nt)
+model = gam(FA1 ~ Group + s(Ages, by = Group, bs = "ts", k =3), method = "ML", data = adhd_combined_nt)
 summary(model)
 
 plot_diff(model, view="Ages",         
         comp=list(Group=c("ADHD Combined", "Neurotypical")),
         main='Ages window(s) of significant difference(s): 5 - 15.6')
 
-ggplot(data= adhd_combined_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("dodgerblue","red")) + 
-  scale_color_manual(values = c("dodgerblue","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) 
+summary(aov(FA3 ~ Group*Ages*Sex, data = adhd_combined_nt))
 
 ```
 
 ```{r}
 
-model = gam(TC1 ~ Group_Sex + s(Ages, by = Group_Sex, bs = "ts"), method = "ML", data = adhd_combined_nt)
-summary(model)
-
-plot_diff(model, view="Ages",         
-        comp=list(Group_Sex=c("ADHD Combined.Female", "Neurotypical.Female")),
-        main='Female Ages window(s) of significant difference(s): 5 - 9.7')
-
-ggplot(data= adhd_combined_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
+ggplot(data= adhd_combined_nt, mapping = aes(fill = Group, y=FA1, x=Ages, color=Group)) + 
   stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
   scale_x_continuous(breaks=seq(5, 21, 4)) +
   scale_y_continuous(breaks=seq(-2,2,1)) +
@@ -116,6 +86,49 @@ ggplot(data= adhd_combined_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=
         axis.title.y = element_text(size=16, face="bold",),
         title = element_text(size=14, face="bold",)) + 
   geom_point(alpha = .4) + facet_wrap(~Sex)
+
+summary(aov(FA1 ~ Ages*Sex*Group, data = adhd_combined_nt))
+
+```
+
+```{r}
+
+model = gam(TC1 ~ Group_Sex + s(Ages, by = Group_Sex, bs = "ts"), method = "ML", data = adhd_combined_nt)
+summary(model)
+
+plot_diff(model, view="Ages",         
+        comp=list(Group_Sex=c("ADHD Combined.Female", "Neurotypical.Female")),
+        main='Female Ages window(s) of significant difference(s): 5 - 9.7')
+
+ggplot(data= adhd_combined_nt, mapping = aes(fill = Group, y=FA1, x=Ages, color=Group)) + 
+  stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
+  scale_x_continuous(breaks=seq(5, 21, 4)) +
+  scale_y_continuous(breaks=seq(-2,2,1)) +
+  theme(axis.line = element_line(size=2, colour = "black"),
+        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
+        panel.border = element_blank(), panel.background = element_blank()) +
+  theme(panel.grid.major = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(), 
+    axis.text.x = element_text(face="bold", color="black", 
+                           size=15, vjust=.5,),
+          axis.text.y = element_text(face="bold", color="black", 
+                           size=15),
+    axis.ticks.length=unit(0.3,"cm"),
+    axis.ticks.x=element_line(size=2),
+    axis.ticks.y=element_line(size=2)) + 
+  theme(legend.title = element_text(size = 14, face = "bold",), 
+    legend.text = element_text(size = 12, face = "bold",)) + 
+   scale_fill_manual(values = c("dodgerblue","red")) + 
+  scale_color_manual(values = c("dodgerblue","red")) +
+  expand_limits(x=c(5,21), y =c(-2,2)) +
+  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
+  theme(axis.title.x = element_text(size=16, face="bold",),
+        axis.title.y = element_text(size=16, face="bold",),
+        title = element_text(size=14, face="bold",)) + 
+  geom_point(alpha = .4) + facet_wrap(~Sex)
+
+
 
 ```
 
@@ -129,13 +142,31 @@ adhd_inatentive_nt <- df %>%
   mutate(Group = as.factor(Group)) %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
-model = gam(TC1 ~ Group + s(Ages, by = Group, bs = "ts", k =3), method = "ML", data = adhd_inatentive_nt)
+model = gam(FA1 ~ Group + s(Ages, by = Group, bs = "ts", k =3), method = "ML", data = adhd_inatentive_nt)
 summary(model)
 
 plot_diff(model, view="Ages",         
         comp=list(Group=c("ADHD Inattentive", "Neurotypical")),
         main='Ages window(s) of significant difference(s): 5 - 8')
 
+model = gam(FA2 ~ Group + s(Ages, by = Group, bs = "ts", k =3), method = "ML", data = adhd_inatentive_nt)
+summary(model)
+
+plot_diff(model, view="Ages",         
+        comp=list(Group=c("ADHD Inattentive", "Neurotypical")),
+        main='Ages window(s) of significant difference(s): 5 - 8')
+
+
+model = gam(FA3 ~ Group + s(Ages, by = Group, bs = "ts", k =3), method = "ML", data = adhd_inatentive_nt)
+summary(model)
+
+plot_diff(model, view="Ages",         
+        comp=list(Group=c("ADHD Inattentive", "Neurotypical")),
+        main='Ages window(s) of significant difference(s): 5 - 8')
+
+```
+
+```{r}
 
 ggplot(data= adhd_inatentive_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
   stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
@@ -165,13 +196,6 @@ ggplot(data= adhd_inatentive_nt, mapping = aes(fill = Group, y=TC1, x=Ages, colo
         title = element_text(size=14, face="bold",)) + 
   geom_point(alpha = .4) 
 
-model = gam(TC1 ~ Group_Sex + s(Ages, by = Group_Sex, bs = "tp", k =3), method = "ML", data = adhd_inatentive_nt)
-summary(model)
-
-plot_diff(model, view="Ages",         
-        comp=list(Group_Sex=c("ADHD Inattentive.Female", "Neurotypical.Female")),
-        main='Ages window(s) of significant difference(s): 5 - 8')
-
 ggplot(data= adhd_inatentive_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
   stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
   scale_x_continuous(breaks=seq(5, 21, 4)) +
@@ -200,6 +224,9 @@ ggplot(data= adhd_inatentive_nt, mapping = aes(fill = Group, y=TC1, x=Ages, colo
         title = element_text(size=14, face="bold",)) + 
   geom_point(alpha = .4) + facet_wrap(~Sex)
 
+
+
+summary(aov(FA1 ~ Group + Ages + Sex, data = adhd_inatentive_nt))
 ```
 
 # Anxiety 
@@ -213,12 +240,17 @@ anxiety_nt <- df %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
 
-model = gam(TC1 ~ Group + Sex + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = anxiety_nt)
+model = gam(FA3 ~ Group + Sex + s(Ages, by = Group, bs = "ts", k=3), method = "REML", data = anxiety_nt)
 summary(model)
 
 plot_diff(model, view="Ages",         
         comp=list(Group=c("Anxiety", "Neurotypical")),
         main='Ages window(s) of significant difference(s): 5 - 7.3')
+
+
+```
+
+```{r}
 
 ggplot(data= anxiety_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
   stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
@@ -256,7 +288,7 @@ plot_diff(model, view="Ages",
         comp=list(Group_Sex=c("Anxiety.Female", "Neurotypical.Female")),
         main='Ages window(s) of significant difference(s): 5 - 7.2')
 
-ggplot(data= anxiety_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
+ggplot(data= anxiety_nt, mapping = aes(fill = Group, y=FA1, x=Ages, color=Group)) + 
   stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
   scale_x_continuous(breaks=seq(5, 21, 4)) +
   scale_y_continuous(breaks=seq(-2,2,1)) +
@@ -284,6 +316,7 @@ ggplot(data= anxiety_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)
         title = element_text(size=14, face="bold",)) + 
   geom_point(alpha = .4) + facet_wrap(~Sex)
 
+summary(aov(FA2 ~ Ages*Sex*Group, data = anxiety_nt))
 ```
 
 # Autism with ADHD 
@@ -296,13 +329,36 @@ autism_nt <- df %>%
   mutate(Group = as.factor(Group)) %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
-model = gam(TC1 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_nt)
+model = gam(FA1 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_nt)
 summary(model)
 
 
 plot_diff(model, view="Ages",         
         comp=list(Group=c("ASD without ADHD", "Neurotypical")),
         main='Ages window(s) of significant difference(s): 7 - 21')
+
+
+model = gam(FA2 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_nt)
+summary(model)
+
+
+plot_diff(model, view="Ages",         
+        comp=list(Group=c("ASD without ADHD", "Neurotypical")),
+        main='Ages window(s) of significant difference(s): 7 - 21')
+
+
+model = gam(FA3 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_nt)
+summary(model)
+
+
+plot_diff(model, view="Ages",         
+        comp=list(Group=c("ASD without ADHD", "Neurotypical")),
+        main='Ages window(s) of significant difference(s): 7 - 21')
+
+
+```
+
+```{r}
 
 ggplot(data= autism_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
   stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
@@ -333,6 +389,7 @@ ggplot(data= autism_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group))
   geom_point(alpha = .4) 
 
 
+summary(aov(FA3 ~ Group + Ages + Sex, data = autism_nt))
 ```
 
 # Austism with ADHD 
@@ -346,13 +403,33 @@ autism_adhd_nt <- df %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
 
-model = gam(TC1 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_adhd_nt)
+model = gam(FA1 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_adhd_nt)
 summary(model)
 
 plot_diff(model, view="Ages",         
         comp=list(Group=c("ASD with ADHD", "Neurotypical")),
         main='Ages window(s) of significant difference(s): 5 - 7.2')
 
+model = gam(FA2 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_adhd_nt)
+summary(model)
+
+plot_diff(model, view="Ages",         
+        comp=list(Group=c("ASD with ADHD", "Neurotypical")),
+        main='Ages window(s) of significant difference(s): 5 - 7.2')
+
+
+model = gam(FA3 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_adhd_nt)
+summary(model)
+
+plot_diff(model, view="Ages",         
+        comp=list(Group=c("ASD with ADHD", "Neurotypical")),
+        main='Ages window(s) of significant difference(s): 5 - 7.2')
+
+
+
+```
+
+```{r}
 ggplot(data= autism_adhd_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
   stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
   scale_x_continuous(breaks=seq(5, 21, 4)) +
@@ -417,9 +494,6 @@ ggplot(data= autism_adhd_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Gr
         title = element_text(size=14, face="bold",)) + 
   geom_point(alpha = .4) + facet_wrap(~Sex)
 
-
-
-
 ```
 
 # Depression 
@@ -432,7 +506,21 @@ depression_nt <- df %>%
   mutate(Group = as.factor(Group)) %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
-model = gam(TC2 ~ Group + Sex + s(Ages, by = Group, bs = "ts",  k=3), method = "ML", data = depression_nt)
+model = gam(FA1 ~ Group + Sex + s(Ages, by = Group, bs = "ts",  k=3), method = "ML", data = depression_nt)
+summary(model)
+
+plot_diff(model, view="Ages",         
+        comp=list(Group=c("Depression", "Neurotypical")),
+        main='Ages window(s) of significant difference(s): 5 - 13.1')
+
+model = gam(FA2 ~ Group + Sex + s(Ages, by = Group, bs = "ts",  k=3), method = "ML", data = depression_nt)
+summary(model)
+
+plot_diff(model, view="Ages",         
+        comp=list(Group=c("Depression", "Neurotypical")),
+        main='Ages window(s) of significant difference(s): 5 - 13.1')
+
+model = gam(FA3 ~ Group + Sex + s(Ages, by = Group, bs = "ts",  k=3), method = "ML", data = depression_nt)
 summary(model)
 
 plot_diff(model, view="Ages",         
@@ -440,8 +528,13 @@ plot_diff(model, view="Ages",
         main='Ages window(s) of significant difference(s): 5 - 13.1')
 
 
-ggplot(data= depression_nt, mapping = aes(fill = Group, y=TC2, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
+
+```
+
+```{r}
+
+ggplot(data= depression_nt, mapping = aes(fill = Group, y=FA3, x=Ages, color=Group)) + 
+  stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "ts"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
   scale_x_continuous(breaks=seq(5, 21, 4)) +
   scale_y_continuous(breaks=seq(-2,2,1)) +
   theme(axis.line = element_line(size=2, colour = "black"),
@@ -469,6 +562,7 @@ ggplot(data= depression_nt, mapping = aes(fill = Group, y=TC2, x=Ages, color=Gro
   geom_point(alpha = .4) 
 
 
+summary(aov(FA2 ~ Group + Ages + Sex, data = depression_nt))
 ```
 
 # Learning Disorders 
@@ -553,44 +647,33 @@ ggplot(data= learning_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group
         axis.title.y = element_text(size=16, face="bold",),
         title = element_text(size=14, face="bold",)) + 
   geom_point(alpha = .4) + facet_wrap(~Sex)
+
+summary(aov(FA3 ~ Group*Ages*Sex, data = learning_nt))
 ```
+
 
 ```{r}
 
-Temp_Disc = read.csv("/Users/jacob.derosa/Desktop/Scripts/temp_disc_df.csv", header = T, sep = ",") %>% select(URSI, TC1, TC2)
+df_fa = df %>% select(URSI, FA1, FA2, FA3)
 
-Split_1 = read.csv("/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Temp_Cluster_Split_1.csv", header = T, sep = ",")[-1] %>% mutate(cluster = as.factor(cluster)) %>% left_join(Temp_Disc) %>%
-  mutate(Group_Sex = as.factor(interaction(cluster, Sex))) 
-
-Split_2 = read.csv("/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Temp_Cluster_Split_2.csv",header = T, sep = ",")[-1] %>% mutate(cluster = as.factor(cluster))  %>% left_join(Temp_Disc) %>%
-  mutate(Group_Sex = as.factor(interaction(cluster, Sex)))
+Split_1 = read.csv("/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Temp_Cluster_All.csv", header = T, sep = ",") %>% inner_join(df_fa) %>% mutate(cluster= as.factor(cluster))
 
 
-```
 
-```{r}
-
-model = gam(TC1 ~ Group_Sex + s(Age, by = Group_Sex, bs = "ts", k =3), data = Split_1, method = "REML") 
+model = gam(FA3 ~ cluster + s(Age, by = cluster, bs = "ts",  k=3), method = "REML", data = Split_1)
 summary(model)
 
 plot_diff(model, view="Age",         
-        comp=list(Group_Sex=c("1.1", "3.1")),
-        main='Ages window(s) of significant difference(s): 5 - 9.3')
-
-
-model = gam(TC1 ~ Group_Sex + s(Age, by = Group_Sex, bs = "ts", k =3), data = Split_2, method = "REML") 
-summary(model)
-
-plot_diff(model, view="Age",         
-        comp=list(Group_Sex=c("1.1", "3.1")),
-        main='Ages window(s) of significant difference(s): 5 - 9.3')
+        comp=list(cluster=c("3", "4")),
+        main='Ages window(s) of significant difference(s): 5 - 7.5')
 
 
 ```
 
 ```{r}
+col1 = RColorBrewer::brewer.pal(6, "Set1")
 
-ggplot(data= Split_1, mapping = aes(fill = cluster, y=TC1, x=Age, color=cluster)) + 
+ggplot(data= Split_1, mapping = aes(fill = cluster, y=FA3, x=Age, color=cluster)) + 
   stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = cluster))) + 
   scale_x_continuous(breaks=seq(5, 21, 4)) +
   scale_y_continuous(breaks=seq(-2,2,1)) +
@@ -609,53 +692,15 @@ ggplot(data= Split_1, mapping = aes(fill = cluster, y=TC1, x=Age, color=cluster)
     axis.ticks.y=element_line(size=2)) + 
   theme(legend.title = element_text(size = 14, face = "bold",), 
     legend.text = element_text(size = 12, face = "bold",)) + 
-  #scale_fill_manual(values = c("steelblue2","red")) + 
-  #scale_color_manual(values = c("steelblue2","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",))
-
-
-ggplot(data= Split_2, mapping = aes(fill = cluster, y=TC1, x=Age, color=cluster)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = cluster))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-  #scale_fill_manual(values = c("steelblue2","red")) + 
-  #scale_color_manual(values = c("steelblue2","red")) +
+   scale_fill_manual(values = c(col1)) + 
+  scale_color_manual(values = c(col1)) +
   expand_limits(x=c(5,21), y =c(-2,2)) +
   labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
   theme(axis.title.x = element_text(size=16, face="bold",),
         axis.title.y = element_text(size=16, face="bold",),
         title = element_text(size=14, face="bold",)) 
 
-
-
-X = rbind(Split_1, Split_2)
-
-model = gam(TC1 ~ cluster + s(Age, by = cluster, bs = "ts", k =3), data = X, method = "ML")
-summary(model)
-
-plot_diff(model, view="Age",         
-        comp=list(cluster=c("1", "3")),
-        main='Ages window(s) of significant difference(s): 5 - 9.3')
-
-
 ```
+
+
 

@@ -1,0 +1,601 @@
+---
+title: "Scipt Cleaning"
+author: "Jacob DeRosa"
+date: "5/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = F, message = F}
+library(tidyverse)
+library(ggplot2)
+library(viridis)
+library(readxl)
+library(corrplot)
+library(knitr)
+library(REdaS) # for diagnostic data checks before FA
+library(psych)# need for factor analysis
+library(GPArotation) # need for factor analysis
+library(polycor)
+library(lavaan)
+library(sjmisc)
+```
+
+```{r, echo = F}
+#import data 
+Diagnosis <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Diagnosis.csv", header = T, sep = ",")
+
+CBCL_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/CBCL_r8.csv", header =T, sep = ",")
+
+Temp_Disc_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Temp_Disc_r8.csv", header =T, sep = ",")
+
+Basic_Demos_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Basic_Demos_r8.csv", header =T, sep = ",")
+
+```
+
+```{r, echo = F}
+
+Temp_Disc <- Temp_Disc_r8 %>%
+  select(URSI, ends_with("_k")) %>%
+  rename(R_10 = Temp_Disc_run1_k) %>%
+  rename(R_1000 = Temp_Disc_run2_k) %>%
+  rename(R_1_Mil = Temp_Disc_run3_k) %>%
+  rename(R_1000_Past = Temp_Disc_run4_k) %>%
+  rename(R_1000_Exp_0 = Temp_Disc_run5_k) %>%
+  rename(R_Snack = Temp_Disc_run6_k) %>%
+  na.omit(.)
+
+Temp_Disc[,2:7] <- log(Temp_Disc[,2:7]) 
+
+domain_data = Temp_Disc[,2:7]
+
+omega(Temp_Disc[2:7])
+```
+
+```{r, echo = F}
+
+dom_polycor = cor(domain_data)
+
+dom_par_analysis <- fa.parallel(dom_polycor, n.obs = nrow(domain_data), n.iter = 1000, error.bars = TRUE)
+
+vss(dom_polycor, n.obs = nrow(domain_data), rorate ="oblimin")
+
+NumFactors <- dom_par_analysis$nfact
+
+FA <- psych::fa(r = dom_polycor, n.obs = nrow(domain_data), nfactors = NumFactors, scores="Bartlett",rotate = 'oblimin')
+
+
+```
+
+## get the eigenvalues 
+question is whether this goes in order that we want?
+```{r, echo = F}
+
+number_of_bootstraps = 1000
+# e.values are eigenvalues 
+FA_eigen <- data.frame(FA$e.values)
+names(FA_eigen) <- "eigenvalues"
+# assigning Factor number in numeric order 
+FA_eigen$factors <- as.numeric(as.character(rownames(FA_eigen)))
+
+#saveFA_eigen, file = paste0('../output/', analysis_name, '/FA_eigenvalues.Rdata'))
+```
+
+## variance accounted for 
+```{r, echo = F}
+FA_variance <- data.frame(FA$Vaccounted)
+# changing the names to be in numeric order, based on amount of variance explained.
+names(FA_variance) <- c(1:ncol(FA_variance))
+
+# adding labels for the different values provided in this dataset 
+FA_variance <- FA_variance %>%
+  mutate(value = rownames(data.frame(FA$Vaccounted)))
+
+
+#saveFA_variance, file = paste0('../output/', analysis_name, '/FA_variance_accounted.Rdata'))
+```
+
+## An item by factor (pattern) loading matrix of class loadings. 
+note: the factors are numbered BEFORE rotation, so they're actually not in the order we want them to be in! 
+```{r, echo = F}
+# show factor loadings in pretty format with model output 
+#print(FABoot, cutoff = 0, sort  = T, digits = 3)
+# h2 = communality - total amount of variance it shares with all factors 
+# u2 = uniqueness = 1-h2. greater value means lower relevance in factor model 
+
+print(FA, cuttoff = 0, sort = T, digits = 3)
+#AFullSample$loadings
+```
+
+
+## get Sample loadings 
+```{r, echo = F}
+# get loadings
+FA_loadings <- data.frame(matrix(FA$loadings, ncol = NumFactors))
+# rename them based on numeric order, of variance explained, not original (un-rotated) labels 
+names(FA_loadings) <- c(1:NumFactors)
+
+# get variable names & weights for later. 
+FA_weights <- data.frame(FA$weights)
+# rename weights based on numeric order, of variance explained, not original (un-rotated) labels 
+names(FA_weights) <- c(1:NumFactors)
+
+FA_weights <- FA_weights %>%
+  # pull out variable labels
+  mutate(variables = rownames(data.frame(FA$weights))) 
+# add thse labels to the loadings too 
+FA_loadings$variables <- FA_weights$variables
+#saveFA_loadings, file = paste0('../output/', analysis_name, '/FA_loadings_wide.Rdata'))
+# convert to long format 
+FA_loadings_df_long <- FA_loadings %>%
+  gather(key = factor, value = loading, 1:NumFactors)
+
+#saveFA_loadings_df_long, file = paste0('../output/', analysis_name, '/FA_loadings_df_long.Rdata'))
+```
+
+## get scores for each subjects 
+The beta weights to find the factor score estimates. These are also used by the predict.psych function to find predicted factor scores for new cases. These weights will depend upon the scoring method requested.
+```{r, echo = F}
+
+# get raw data into matrix format 
+domain_matrix <- domain_data %>%
+  as.matrix(.)
+
+## FULL SAMPLE VERSION with labels! 
+weights_matrix <- FA_weights %>%
+  select(-variables) %>%
+    as.matrix(.)
+
+# get pacct labels to add to predictions,
+
+domain_labels <- domain_data %>%
+  mutate(subject = as.numeric(rownames(domain_data)))
+nrow(domain_labels)
+
+FAsubject_scores <- cbind(domain_labels, domain_matrix%*%weights_matrix)
+
+#saveFAsubject_scores, file = paste0('../output/', analysis_name, '/FA_subject_factor_scores.Rdata'))
+                                            
+```
+
+# Run Bootstrapped version of FA 
+```{r, warning = F}
+square <- function(x){
+  squared <- x*x
+  return(squared)
+}
+
+# setting number of iterations
+nBoots = number_of_bootstraps
+# creating empty dataframe to add bootstrap results
+bootFrame = data.frame(eigMat = rep(NA, nBoots), loadings = rep(NA, nBoots), subPreds = rep(NA, nBoots),
+                       varAccounted = rep(NA, nBoots))
+
+# start loop of 1000 iterations
+for (i in 1:nBoots){
+  usableSample = FALSE
+  while (usableSample == FALSE){
+    # select a random sample of the data
+    ind = sample(1:nrow(domain_matrix), size = nrow(domain_matrix), replace = TRUE)
+    bootSamples = domain_matrix[ind, ]
+    # not going to move forward  until the data has a good correlation matrix (usableSample = true)
+    # aka will not run if the data has a bad correlation matrix (usableSample - false)
+    # (e.g. NA, because one variable all same values)
+    if (!any(is.na(cor(bootSamples)))){
+      usableSample = TRUE
+    }
+  }
+  # run the factor analysis on bootstrapped sample
+  boot_corr <- cor(bootSamples)
+  FABoot <- fa(r = boot_corr, n.obs = nrow(domain_matrix), nfactors = NumFactors, scores = "Bartlett", rotate = 'oblimin')
+  
+  # get eigenvalues ... 1 per number of dimensions
+  FABoot_eigen <- data.frame(FABoot$e.values)
+  names(FABoot_eigen) <- "eigenvalues"
+  # these are arlready in numeric values 
+  FABoot_eigen$factors <- as.numeric(as.character(rownames(FABoot_eigen)))
+
+  # get loadings
+  FABoot_loadings <- data.frame(matrix(FABoot$loadings, ncol = NumFactors))
+  names(FABoot_loadings) <- c(1:NumFactors)
+  
+  # make abs value version 
+  FABoot_loadings_abs <- abs(FABoot_loadings)
+  
+  # add variable names
+  FABoot_loadings_abs$variables <- rownames(data.frame(FABoot$weights))
+  FABoot_loadings$variables <- rownames(data.frame(FABoot$weights)) 
+  
+  # get subject scoress 
+  weights_matrix <- as.data.frame(FABoot$weights)
+  # adding numeric factor numbers instead of original (un-rotated) labels 
+  names(weights_matrix) <- c(1:NumFactors)
+  
+  weights_matrix <- weights_matrix %>%
+     as.matrix(.)
+  
+  # multiply with the raw data to get subject scores
+  FABoot_subject_scores <- domain_matrix%*%weights_matrix
+  
+  # get variance accounted
+  FABoot_variance <- as.data.frame(FABoot$Vaccounted)
+    # adding numeric factor numbers instead of original (un-rotated) labels 
+  names(FABoot_variance) <- c(1:NumFactors)
+  FABoot_variance <- FABoot_variance %>%
+    mutate(value = rownames(as.data.frame(FABoot$Vaccounted)))
+
+  # save output/', analysis_name, '/ 
+  bootFrame$eigMat[i] = list(FABoot_eigen)
+  bootFrame$loadings[i] = list(FABoot_loadings)
+  bootFrame$absloadings[i] = list(FABoot_loadings_abs)
+  bootFrame$subPreds[i] = list(FABoot_subject_scores)
+  bootFrame$varAccounted[i] = list(FABoot_variance)
+  
+}
+
+#savebootFrame, file = paste0('../output/', analysis_name, '/FABootstrap.rda'))
+
+```
+
+```{r, echo = F}
+
+# calculate their absolute values 
+sub_absloadings <- abs(FA_loadings[, 1:NumFactors])
+  
+#initiate empty lists to save matched output 
+FA_matching_absloadings <- list()
+FA_matching_eig <-list()
+FA_matching_preds <-list()
+FA_matching_varaccounted <- list() 
+
+for (k in 1:nrow(bootFrame)){
+  # for each iteration, get the outputs 
+  bootstrap_absloadings <- bootFrame$absloadings[[k]] # Absolute value loadings 
+  bootstrap_eig = bootFrame$eigMat[[k]]
+  bootstrap_preds = bootFrame$subPreds[[k]]
+  bootstrap_varaccounted = bootFrame$varAccounted[[k]] %>%
+    select(-value)
+  
+  bootstrap_varaccounted_labels = bootFrame$varAccounted[[k]] %>%
+    select(value)
+  
+  # pull the loadings for that iteration
+  boot_sub_absloadings <- bootstrap_absloadings[,1:NumFactors]
+  # combine full sample loadings with boot loadings
+  loadings_mat <- cbind(sub_absloadings,boot_sub_absloadings)
+  
+  # calculate their correlations
+  cormat <- cor(loadings_mat, method='pearson')
+  # get the correlations specifically between the full sample & boot loadings and save
+  submat1 <- cormat[(NumFactors+1):(NumFactors*2),1:NumFactors]
+  
+  i <- 1
+  orderVector<-vector()
+  # find which ones are max correlated - indicating they are reflecting the same dimension / factor
+  for (i in (1:NumFactors)){
+    var<- which.max(submat1[,i]) #which max row for column i
+    submat1[var,]<- -2
+    orderVector<-c(orderVector,var)
+  }
+  
+  # Reorganize the dimensions for loadings, eigenvalues, and subject predictions based on matched PCs
+  reorg_boot_absloadings <- boot_sub_absloadings[,c(orderVector)]
+  reorg_boot_eig <- bootstrap_eig[c(orderVector),]
+  reorg_boot_preds <- bootstrap_preds[,c(orderVector)]
+  reorg_boot_varaccounted <- bootstrap_varaccounted[, c(orderVector)]
+  
+  # Save into output list
+  FA_matching_absloadings[[k]] <- reorg_boot_absloadings
+  FA_matching_eig[[k]] <- reorg_boot_eig
+  FA_matching_preds[[k]] <- reorg_boot_preds
+  FA_matching_varaccounted[[k]] <- cbind( bootstrap_varaccounted_labels, reorg_boot_varaccounted)
+}
+
+
+#saveFA_matching_absloadings, FA_matching_eig, FA_matching_preds, FA_matching_varaccounted, file=paste0('../output/', analysis_name,'/FABoot_matched.rda'))
+
+```
+
+
+# Plots of variable loadings onto FA
+## getting data organized
+```{r, echo = F}
+
+# variable list
+var_list <- FA_loadings$variables
+
+#rename file for FA full sample to for simplicity & 
+# get absolute value loadings to plot against boostrapped verrsion
+fullSampLoadingsLong <- FA_loadings_df_long %>%
+         mutate(absloading = abs(loading))
+
+# For bootstrapped absolute value loadings, 
+# loop through to change list to neat dataframe 
+for (i in 1:length(FA_matching_absloadings)){
+  tmp = data.frame(FA_matching_absloadings[[i]])
+  names(tmp) =  1:ncol(tmp)
+  tmp$variables = var_list
+  tmp$iter = i
+  if (i == 1){
+    bootMatch = tmp 
+  }
+  else{
+    bootMatch = rbind(bootMatch, tmp)
+  }
+}
+
+# put bootMatch dataframe in long form, then summarize for confidence intervals 
+bootMatchSummary = bootMatch %>%
+  tidyr::gather(key = 'factor', value = 'absloading', 1:NumFactors, -variables) %>%
+# get CI 
+  dplyr::group_by(variables, factor) %>%
+  dplyr::summarise(meanabsLoad = mean(absloading),
+            lwr95 = quantile(absloading, probs = .025),
+            upr95 = quantile(absloading, probs = .975),
+            lwr80 = quantile(absloading, probs = .1),
+            upr80 = quantile(absloading, probs = .9),
+            standev = sd(absloading))
+
+```
+
+## plot absolute value loadings from bootstrap 
+```{r, echo = F}
+loadingBootMatchPlot <-
+  ggplot(bootMatchSummary, aes(x = variables, y = meanabsLoad)) +
+  geom_hline(yintercept = 0, color = 'black', size = 0.4, type = "dashed") +
+  geom_errorbar(data = bootMatchSummary, 
+                aes(ymin = lwr95, ymax = upr95), width = 0, alpha = .5) +
+  geom_errorbar(data = bootMatchSummary, 
+                aes(ymin = lwr80, ymax = upr80), width = 0, lwd = 1) +
+  geom_point(size = 1.5) + # black points are 
+  geom_point(data = fullSampLoadingsLong, 
+             aes(x = variables, y = absloading), color = 'red', size = .5) +
+  facet_grid(~factor) +
+  coord_flip() +
+  theme_bw() +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=20),
+        axis.title.y = element_text(face="bold", colour="black", size=20),
+        axis.text.x  = element_text(size=6),
+           axis.text.y  = element_text(size=16))
+  labs(title = 'Boostrap (w/matching) Distributions of Variable loadings on FA. Red points are loadings from FA fit to full sample', y = 'Absolute value Loading')
+
+# save the plot 
+loadingBootMatchPlot
+#gg#saveloadingBootMatchPlot, height = 8, width = 12, file = paste0('../plots/', analysis_name, '/FA_oblimin_absLoading_BootMatch_Plot.#png'))
+
+# re-organize this for future 2 way cluster plotting and save.
+bootMatchLoadingsFor2WayClust = bootMatchSummary %>%
+  dplyr::select(., variables, factor, meanabsLoad) %>%
+  tidyr::spread(key = factor, value = meanabsLoad)
+
+#savebootMatchLoadingsFor2WayClust,bootMatchSummary, fullSampLoadingsLong, file = paste0('../output/', analysis_name, '/FAbootstrapabsLoadingMeans.rda'))
+
+```
+
+#  Plot raw loadings (not absolute values) from sample
+Quick permutation test to make a null baseline for correlations -- not sure about the thresholding yet
+```{r}
+# make a null distribution to compare the raw loadings with 
+nPerms = 1000
+corVec = rep(NA, nPerms) 
+for (jj in 1:nPerms){
+  var1 = rnorm(n = nrow(domain_data))
+  var2 = rnorm(n = nrow(domain_data))
+  corVec[jj] = cor(var1, var2)
+}
+hist(abs(corVec))
+
+# make the boundary the 99% percentile?
+boundary = quantile(abs(corVec), prob = .99)
+
+# take the raw loadings, and label them depending on whether the bootstrap loading was stable
+# (different than zero)
+regularLoadings <- fullSampLoadingsLong %>%
+  left_join(., bootMatchSummary, by = c('variables', 'factor')) %>%
+  mutate(., Stability = ifelse(meanabsLoad - 2*standev > 0, 'Stable', 'Unstable'))
+
+
+# plot the raw loadings with color codes
+loadingsNoAbsValPlot = ggplot(regularLoadings, aes(x = variables, y = loading, color = Stability)) +
+  geom_hline(yintercept = 0) +
+  geom_point(size = 3, alpha = 0.8) + 
+  facet_grid(~factor) + 
+  coord_flip() + 
+  theme_bw() +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=20),
+        axis.title.y = element_text(face="bold", colour="black", size=20),
+        axis.text.x  = element_text(size=6),
+           axis.text.y  = element_text(size=16))
+loadingsNoAbsValPlot
+#ggsave(loadingsNoAbsValPlot, height = 8, width = 12, file = paste0(' C:/Users/jacob.derosa/Documents/GitHub/Delay_Discounting/Scripts/plots/', analysis_name, '/FA_oblimin_LoadingFullNotAbsoluteValued.#png'))
+```
+
+
+# Plots of Bootstrapped subject-level scores on FAs 1-5
+## organizing data
+```{r}
+# relabel factor numbers for the Full Sample based on new order from Bootstrap matching
+# so we can directly compare.
+for (i in 1:length(FA_matching_preds)){
+  tmp = data.frame(FA_matching_preds[[i]])
+  names(tmp) = paste0('bootFactor', 1:ncol(tmp))
+  tmp$subject = floor(as.numeric(row.names(tmp)))
+  tmp$iter = i
+  if (i == 1){
+    bootMatchPreds = tmp 
+  }
+  else{
+    bootMatchPreds = rbind(bootMatchPreds, tmp)
+  }
+}
+
+bootMatchPredSummary = bootMatchPreds %>%
+  tidyr::gather(., key = 'factor', value = 'prediction', contains("bootFactor")) %>%
+  group_by(factor, subject) %>%
+  dplyr::summarise(meanPred = mean(prediction)) %>%
+  tidyr::spread(key = factor, value = meanPred)
+
+
+# add Full Sample subject scores to bootstrap predictions
+bootMatchPredSummary <- merge(bootMatchPredSummary, FAsubject_scores,  by = "subject") 
+
+
+##png(filename=paste0(' C:/Users/jacob.derosa/Documents/GitHub/Delay_Discounting/Scripts/plots/', analysis_name, '/FA_oblimin_corrplot_sample_vs_bootmatch.#png'))
+# plot correlations between Bootstrap and Full Sample FA scores
+bootMatchPredsFirst5Cor =bootMatchPredSummary %>%
+  dplyr::select(starts_with("boot"), starts_with("1"), starts_with("2"), starts_with("3"),starts_with("4")) %>%
+  cor() %>%
+  corrplot(type = 'lower')
+bootstrap_FA_corr<-corrplot(bootMatchPredsFirst5Cor, type = 'lower')
+dev.off()
+
+# save this plot
+
+bootMatchPredSummary %>%
+  dplyr::select(starts_with("boot"), starts_with("sample")) %>%
+  cor() %>%
+  corrplot(type = 'lower')
+dev.off() 
+
+
+
+```
+## Scree plot with confidence!!
+```{r}
+# just converting list object into a dataframe for plotting
+for (i in 1:length(FA_matching_eig)){
+  tmp = data.frame(FA_matching_eig[[i]])
+  tmp$iter = i
+  if (i == 1){
+    bootMatchEig = tmp 
+  }
+  else{
+    bootMatchEig = rbind(bootMatchEig, tmp)
+  }
+}
+
+# this is already in long format, just need to calculate confidence intervals 
+bootMatchEigSummary = bootMatchEig %>%
+  group_by(factors) %>%
+  dplyr::summarise(meanEig= mean(eigenvalues),
+            eigLwr95 = quantile(eigenvalues, probs = .025),
+            eigUpr95 = quantile(eigenvalues, probs = .975),
+            eigLwr80 = quantile(eigenvalues, probs = .1),
+            eigUpr80 = quantile(eigenvalues, probs = .9))
+
+
+screeEig = ggplot(data = bootMatchEigSummary, aes(x = factors, y = meanEig)) +
+  geom_errorbar(aes(ymin = eigLwr95, ymax = eigUpr95), alpha = .7, width = .05) +
+  geom_errorbar(aes(ymin = eigLwr80, ymax = eigUpr80), width = 0, lwd = 1) +
+  geom_point(size = 2, color = 'purple') +
+  scale_x_continuous(labels = 1:10, breaks = 1:10) +
+  theme_bw() +
+  labs(x = 'Factor', y = 'eigenvalues', title = 'Scree Plot From Matching Boostrap (eigenvaluess)') +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+
+screeEig
+#ggsave(screeEig, file = paste0(' C:/Users/jacob.derosa/Documents/GitHub/Delay_Discounting/Scripts/plots/',analysis_name, '/FA_oblimin_screeeigenvaluess_MatchBoostrap.#png'))
+
+```
+
+
+## prop variance explained
+```{r}
+# same thing, converrt list into dataframe
+for (i in 1:length(FA_matching_varaccounted)){
+   
+  tmp_prop_var = data.frame(FA_matching_varaccounted[[i]]) %>%
+    filter(value == 'Proportion Var')
+  tmp_prop_var_long <- data.frame(t(tmp_prop_var))
+  names(tmp_prop_var_long) <- "PropVar"
+  tmp_prop_var_long <- tmp_prop_var_long %>%
+    filter(PropVar != 'Proportion Var') %>%
+    mutate(iter = i, 
+          factor = c(1:NumFactors),
+          PropVar = as.numeric(as.character(PropVar)))
+
+  if (i == 1){
+    bootMatchPropVar = tmp_prop_var_long
+  }
+  else{
+    bootMatchPropVar = rbind(bootMatchPropVar, tmp_prop_var_long)
+  }
+}
+
+# calculate confidence intervals
+bootMatchVarSummary = bootMatchPropVar %>%
+  group_by(factor) %>%
+  dplyr::summarise(meanPropVar= mean(PropVar),
+            propVarLwr95 = quantile(PropVar, probs = .025),
+            propVarUpr95 = quantile(PropVar, probs = .975),
+            propVarLwr80 = quantile(PropVar, probs = .1),
+            propVarUpr80 = quantile(PropVar, probs = .9))
+
+
+screeProp = ggplot(data = bootMatchVarSummary, 
+                   aes(x = factor, y = meanPropVar)) +
+  geom_errorbar(aes(ymin = propVarLwr95, 
+                    ymax = propVarUpr95), alpha = .7, width = .05) +
+  geom_errorbar(aes(ymin = propVarLwr80, 
+                    ymax = propVarUpr80), width = 0, lwd = 1) +
+  geom_point(size = 2, color = 'purple') +
+  theme_bw() +
+  labs(x = 'Factor', y = 'Proportion Variance Explained', 
+       title = 'Scree Plot From Matching Boostrap (Proportion Variance)') +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+
+screeProp 
+#ggsave(screeProp, file = paste0(' C:/Users/jacob.derosa/Documents/GitHub/Delay_Discounting/Scripts/plots/', analysis_name, '/FA_oblimin_screePropVariance_MatchBoostrap.#png'))
+
+```
+
+## cumulative varriance explained
+```{r}
+# convert list into dataframe
+for (i in 1:length(FA_matching_varaccounted)){
+  tmp_prop_var = data.frame(FA_matching_varaccounted[[i]]) %>%
+    filter(value == 'Cumulative Var')
+  tmp_prop_var_long <- data.frame(t(tmp_prop_var))
+  names(tmp_prop_var_long) <- "cumulativeVar"
+  tmp_prop_var_long$factor = rownames(tmp_prop_var_long)
+  tmp_prop_var_long <- tmp_prop_var_long %>%
+    filter(factor != 'value') %>%
+    mutate( 
+           iter = i, 
+           cumulativeVar = as.numeric(as.character(cumulativeVar)))
+
+  if (i == 1){
+    bootMatchCumulativeVar = tmp_prop_var_long
+  }
+  else{
+    bootMatchCumulativeVar = rbind(bootMatchCumulativeVar, tmp_prop_var_long)
+  }
+}
+# calculate confidence intervals
+bootMatchVarSummary = bootMatchCumulativeVar %>%
+  group_by(factor) %>%
+  dplyr::summarise(meanCumulative = mean(cumulativeVar),
+            cumulativeLwr95 = quantile(cumulativeVar, probs = .025),
+            cumulativeUpr95 = quantile(cumulativeVar, probs = .975),
+            cumulativeLwr80 = quantile(cumulativeVar, probs = .1),
+            cumulativeUpr80 = quantile(cumulativeVar, probs = .9))
+
+screeCumulative = ggplot(data = bootMatchVarSummary, aes(x = factor, y = meanCumulative)) +
+  geom_line() + 
+  geom_errorbar(aes(ymin = cumulativeLwr95, ymax = cumulativeUpr95), alpha = .7, width = .05) +
+  geom_errorbar(aes(ymin = cumulativeLwr80, ymax = cumulativeUpr80), width = 0, lwd = 1) +
+  geom_point(size = 2, color = 'purple') +
+  theme_bw() +
+  #scale_x_continuous(labels = 1:10, breaks = 1:10) +
+  labs(x = 'Factor', y = 'Cumulative Proportion Variance Explained', title = 'Scree Plot From Matching Boostrap (Cumulative Variance)') +
+  ylim(0,1) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+
+screeCumulative
+#ggsave(screeCumulative, file = paste0(' C:/Users/jacob.derosa/Documents/GitHub/Delay_Discounting/Scripts/plots/', analysis_name, '/FA_oblimin_screeCumulativeVariance_MatchBoostrap.#png'))
+```
+
+

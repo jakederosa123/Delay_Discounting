@@ -1,0 +1,45 @@
+---
+title: "Functional Connectivity Bins"
+author: "Jacob DeRosa"
+date: "7/13/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(dplyr)
+
+fc_df = read.csv("/Users/jacob.derosa/Desktop/Scripts/Functional_Cors/fc_cors.csv")[-1] %>% na.omit(.)
+fc_df[2:10] = scale(fc_df[2:10]) 
+
+temp_disc = read.csv("/Users/jacob.derosa/Desktop/Scripts/temp_disc_df.csv")[-1]
+
+write.csv(fc_df, "/Users/jacob.derosa/Documents/Github/Delay_Discounting/Data/Functional_Scaled.csv")
+
+```
+
+```{r}
+
+full_df = fc_df %>% inner_join(temp_disc, by = "URSI") %>% mutate(Age_Bins = ifelse(Ages < 9, "9 Under", 
+                                                                                    ifelse(Ages >= 9  & Ages < 13, "10-12",
+                                                                                           ifelse(Ages > 13, "Over 13", NA)))) %>% na.omit(.)
+
+Nine_Under = full_df %>% filter(Age_Bins == "9 Under")
+
+Ten_Twelve = full_df %>% filter(Age_Bins == "10-12")
+
+Thirteen_Over = full_df %>% filter(Age_Bins == "Over 13")
+
+```
+
+```{r}
+
+write.csv(Nine_Under, "/Users/jacob.derosa/Documents/Github/Delay_Discounting/Data/Nine_Under.csv")
+write.csv(Ten_Twelve, "/Users/jacob.derosa/Documents/Github/Delay_Discounting/Data/Ten_Twelve.csv")
+write.csv(Thirteen_Over, "/Users/jacob.derosa/Documents/Github/Delay_Discounting/Data/Thirteen_Over.csv")
+
+```

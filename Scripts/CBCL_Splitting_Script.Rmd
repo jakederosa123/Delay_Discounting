@@ -8,7 +8,7 @@ output: html_document
 ```{r, include=F, echo=F}
 
 # Load Required Packages
-packages <- c("dplyr", "caTools", "pander", "tidyverse", "ggridges")
+packages <- c("dplyr", "caTools")
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
   install.packages(setdiff(packages, rownames(installed.packages())))
 }
@@ -42,11 +42,12 @@ CBCL = CBCL %>% inner_join(Diagnosis) %>% inner_join(Basic_Demos)
 #CBCL$Ages = floor(CBCL$Age)
 
 
+write.csv(CBCL, "/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/CBCL.csv")
 ```
 
 ```{r}
-
-set.seed(99192)
+set.seed(1574)
+#set.seed(321)
 
 
 smp_siz = floor(0.50*nrow(CBCL[,c(13:25)])) #columns you want to split
