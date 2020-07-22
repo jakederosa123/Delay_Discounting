@@ -448,6 +448,229 @@ bootMatchLoadingsFor2WayClust = bootMatchSummary %>%
 
 ```
 
+#  Plot raw loadings (not absolute values) from sample
+Quick permutation test to make a null baseline for correlations -- not sure about the thresholding yet
+```{r}
+# make a null distribution to compare the raw loadings with 
+nPerms = 1000
+corVec = rep(NA, nPerms) 
+for (jj in 1:nPerms){
+  var1 = rnorm(n = nrow(domain_data))
+  var2 = rnorm(n = nrow(domain_data))
+  corVec[jj] = cor(var1, var2)
+}
+hist(abs(corVec))
+
+# make the boundary the 99% percentile?
+boundary = quantile(abs(corVec), prob = .99)
+
+# take the raw loadings, and label them depending on whether the bootstrap loading was stable
+# (different than zero)
+regularLoadings <- fullSampLoadingsLong %>%
+  left_join(., bootMatchSummary, by = c('variables', 'factor')) %>%
+  mutate(., Stability = ifelse(meanabsLoad - 2*standev > 0, 'Stable', 'Unstable'))
+
+
+# plot the raw loadings with color codes
+loadingsNoAbsValPlot = ggplot(regularLoadings, aes(x = variables, y = loading, color = Stability)) +
+  geom_hline(yintercept = 0) +
+  geom_point(size = 3, alpha = 0.8) + 
+  facet_grid(~factor) + 
+  coord_flip() + 
+  theme_bw() +
+  theme(axis.title.x = element_text(face="bold", colour="black", size=20),
+        axis.title.y = element_text(face="bold", colour="black", size=20),
+        axis.text.x  = element_text(size=6),
+           axis.text.y  = element_text(size=16))
+loadingsNoAbsValPlot
+ggsave(loadingsNoAbsValPlot, height = 8, width = 12, file = paste0(' C:/Users/jacob.derosa/Documents/GitHub/Delay_Discounting/Scripts/plots/', analysis_name, '/FA_oblimin_LoadingFullNotAbsoluteValued.png'))
+```
+
+
+# Plots of Bootstrapped subject-level scores on FAs 1-5
+## organizing data
+```{r}
+# relabel factor numbers for the Full Sample based on new order from Bootstrap matching
+# so we can directly compare.
+for (i in 1:length(FA_matching_preds)){
+  tmp = data.frame(FA_matching_preds[[i]])
+  names(tmp) = paste0('bootFactor', 1:ncol(tmp))
+  tmp$subject = floor(as.numeric(row.names(tmp)))
+  tmp$iter = i
+  if (i == 1){
+    bootMatchPreds = tmp 
+  }
+  else{
+    bootMatchPreds = rbind(bootMatchPreds, tmp)
+  }
+}
+
+bootMatchPredSummary = bootMatchPreds %>%
+  tidyr::gather(., key = 'factor', value = 'prediction', contains("bootFactor")) %>%
+  group_by(factor, subject) %>%
+  dplyr::summarise(meanPred = mean(prediction)) %>%
+  tidyr::spread(key = factor, value = meanPred)
+
+
+# add Full Sample subject scores to bootstrap predictions
+bootMatchPredSummary <- merge(bootMatchPredSummary, FAsubject_scores,  by = "subject") 
+
+
+png(filename=paste0(' C:/Users/jacob.derosa/Documents/GitHub/Delay_Discounting/Scripts/plots/', analysis_name, '/FA_oblimin_corrplot_sample_vs_bootmatch.png'))
+# plot correlations between Bootstrap and Full Sample FA scores
+bootMatchPredsFirst5Cor =bootMatchPredSummary %>%
+  dplyr::select(starts_with("boot"), starts_with("1"), starts_with("2"), starts_with("3"),starts_with("4")) %>%
+  cor() %>%
+  corrplot(type = 'lower')
+bootstrap_FA_corr<-corrplot(bootMatchPredsFirst5Cor, type = 'lower')
+dev.off()
+
+# save this plot
+
+bootMatchPredSummary %>%
+  dplyr::select(starts_with("boot"), starts_with("sample")) %>%
+  cor() %>%
+  corrplot(type = 'lower')
+dev.off() 
+
+
+
+```
+## Scree plot with confidence!!
+```{r}
+# just converting list object into a dataframe for plotting
+for (i in 1:length(FA_matching_eig)){
+  tmp = data.frame(FA_matching_eig[[i]])
+  tmp$iter = i
+  if (i == 1){
+    bootMatchEig = tmp 
+  }
+  else{
+    bootMatchEig = rbind(bootMatchEig, tmp)
+  }
+}
+
+# this is already in long format, just need to calculate confidence intervals 
+bootMatchEigSummary = bootMatchEig %>%
+  group_by(factors) %>%
+  dplyr::summarise(meanEig= mean(eigenvalues),
+            eigLwr95 = quantile(eigenvalues, probs = .025),
+            eigUpr95 = quantile(eigenvalues, probs = .975),
+            eigLwr80 = quantile(eigenvalues, probs = .1),
+            eigUpr80 = quantile(eigenvalues, probs = .9))
+
+
+screeEig = ggplot(data = bootMatchEigSummary, aes(x = factors, y = meanEig)) +
+  geom_errorbar(aes(ymin = eigLwr95, ymax = eigUpr95), alpha = .7, width = .05) +
+  geom_errorbar(aes(ymin = eigLwr80, ymax = eigUpr80), width = 0, lwd = 1) +
+  geom_point(size = 2, color = 'purple') +
+  scale_x_continuous(labels = 1:10, breaks = 1:10) +
+  theme_bw() +
+  labs(x = 'Factor', y = 'eigenvalues', title = 'Scree Plot From Matching Boostrap (eigenvaluess)') +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+
+screeEig
+ggsave(screeEig, file = paste0(' C:/Users/jacob.derosa/Documents/GitHub/Delay_Discounting/Scripts/plots/',analysis_name, '/FA_oblimin_screeeigenvaluess_MatchBoostrap.png'))
+
+```
+
+
+## prop variance explained
+```{r}
+# same thing, converrt list into dataframe
+for (i in 1:length(FA_matching_varaccounted)){
+   
+  tmp_prop_var = data.frame(FA_matching_varaccounted[[i]]) %>%
+    filter(value == 'Proportion Var')
+  tmp_prop_var_long <- data.frame(t(tmp_prop_var))
+  names(tmp_prop_var_long) <- "PropVar"
+  tmp_prop_var_long <- tmp_prop_var_long %>%
+    filter(PropVar != 'Proportion Var') %>%
+    mutate(iter = i, 
+          factor = c(1:NumFactors),
+          PropVar = as.numeric(as.character(PropVar)))
+
+  if (i == 1){
+    bootMatchPropVar = tmp_prop_var_long
+  }
+  else{
+    bootMatchPropVar = rbind(bootMatchPropVar, tmp_prop_var_long)
+  }
+}
+
+# calculate confidence intervals
+bootMatchVarSummary = bootMatchPropVar %>%
+  group_by(factor) %>%
+  dplyr::summarise(meanPropVar= mean(PropVar),
+            propVarLwr95 = quantile(PropVar, probs = .025),
+            propVarUpr95 = quantile(PropVar, probs = .975),
+            propVarLwr80 = quantile(PropVar, probs = .1),
+            propVarUpr80 = quantile(PropVar, probs = .9))
+
+
+screeProp = ggplot(data = bootMatchVarSummary, 
+                   aes(x = factor, y = meanPropVar)) +
+  geom_errorbar(aes(ymin = propVarLwr95, 
+                    ymax = propVarUpr95), alpha = .7, width = .05) +
+  geom_errorbar(aes(ymin = propVarLwr80, 
+                    ymax = propVarUpr80), width = 0, lwd = 1) +
+  geom_point(size = 2, color = 'purple') +
+  theme_bw() +
+  labs(x = 'Factor', y = 'Proportion Variance Explained', 
+       title = 'Scree Plot From Matching Boostrap (Proportion Variance)') +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+
+screeProp 
+ggsave(screeProp, file = paste0(' C:/Users/jacob.derosa/Documents/GitHub/Delay_Discounting/Scripts/plots/', analysis_name, '/FA_oblimin_screePropVariance_MatchBoostrap.png'))
+
+```
+
+## cumulative varriance explained
+```{r}
+# convert list into dataframe
+for (i in 1:length(FA_matching_varaccounted)){
+  tmp_prop_var = data.frame(FA_matching_varaccounted[[i]]) %>%
+    filter(value == 'Cumulative Var')
+  tmp_prop_var_long <- data.frame(t(tmp_prop_var))
+  names(tmp_prop_var_long) <- "cumulativeVar"
+  tmp_prop_var_long$factor = rownames(tmp_prop_var_long)
+  tmp_prop_var_long <- tmp_prop_var_long %>%
+    filter(factor != 'value') %>%
+    mutate( 
+           iter = i, 
+           cumulativeVar = as.numeric(as.character(cumulativeVar)))
+
+  if (i == 1){
+    bootMatchCumulativeVar = tmp_prop_var_long
+  }
+  else{
+    bootMatchCumulativeVar = rbind(bootMatchCumulativeVar, tmp_prop_var_long)
+  }
+}
+# calculate confidence intervals
+bootMatchVarSummary = bootMatchCumulativeVar %>%
+  group_by(factor) %>%
+  dplyr::summarise(meanCumulative = mean(cumulativeVar),
+            cumulativeLwr95 = quantile(cumulativeVar, probs = .025),
+            cumulativeUpr95 = quantile(cumulativeVar, probs = .975),
+            cumulativeLwr80 = quantile(cumulativeVar, probs = .1),
+            cumulativeUpr80 = quantile(cumulativeVar, probs = .9))
+
+screeCumulative = ggplot(data = bootMatchVarSummary, aes(x = factor, y = meanCumulative)) +
+  geom_line() + 
+  geom_errorbar(aes(ymin = cumulativeLwr95, ymax = cumulativeUpr95), alpha = .7, width = .05) +
+  geom_errorbar(aes(ymin = cumulativeLwr80, ymax = cumulativeUpr80), width = 0, lwd = 1) +
+  geom_point(size = 2, color = 'purple') +
+  theme_bw() +
+  #scale_x_continuous(labels = 1:10, breaks = 1:10) +
+  labs(x = 'Factor', y = 'Cumulative Proportion Variance Explained', title = 'Scree Plot From Matching Boostrap (Cumulative Variance)') +
+  ylim(0,1) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+
+screeCumulative
+ggsave(screeCumulative, file = paste0(' C:/Users/jacob.derosa/Documents/GitHub/Delay_Discounting/Scripts/plots/', analysis_name, '/FA_oblimin_screeCumulativeVariance_MatchBoostrap.png'))
+```
+
 ```{r, echo = F}
 FA <- psych::fa(r = domain_data, n.obs = nrow(domain_data),  nfactors = 3, scores = "Bartlett", fm = "wls", rotate = "oblimin")
 

@@ -35,7 +35,16 @@ agepredictTC1table2<-anova(linTC1model,gamTC1model)
 
 ```
 
+# ADHD Combined
 ```{r}
+
+adhd_combined_nt <- df %>%
+  filter(ADHD_C_NA == 1 | NT == 1) %>%
+  mutate(Group = ifelse(ADHD_C_NA == 1, "ADHD Combined", 
+                        ifelse(NT == 1, "Neurotypical", NA))) %>%
+  mutate(Group = as.factor(Group)) %>%
+  mutate(Group_Sex = as.factor(interaction(Group, Sex)))
+
 ivnames = names(adhd_combined_nt)[22:26]
 
 model <- lapply(ivnames, function(x) {
@@ -49,102 +58,6 @@ sapply(model_sex, car::Anova,simplify =  F)
 model_sex_age <- lapply(ivnames, function(x) {
   lm(substitute(i ~ Group*Sex*Ages, list(i = as.name(x))), data = adhd_combined_nt)})
 sapply(model_sex_age, car::Anova,simplify =  F)
-```
-
-
-# ADHD Combined
-```{r}
-
-adhd_combined_nt <- df %>%
-  filter(ADHD_C_NA == 1 | NT == 1) %>%
-  mutate(Group = ifelse(ADHD_C_NA == 1, "ADHD Combined", 
-                        ifelse(NT == 1, "Neurotypical", NA))) %>%
-  mutate(Group = as.factor(Group)) %>%
-  mutate(Group_Sex = as.factor(interaction(Group, Sex)))
-
-model = gam(FA1 ~ Group + s(Ages, by = Group, bs = "ts", k =3), method = "ML", data = adhd_combined_nt)
-summary(model)
-
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("ADHD Combined", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 15.6')
-
-summary(aov(FA3 ~ Group*Ages*Sex, data = adhd_combined_nt))
-
-```
-
-```{r}
-
-ggplot(data= adhd_combined_nt, mapping = aes(fill = Group, y=FA1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("dodgerblue","red")) + 
-  scale_color_manual(values = c("dodgerblue","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) + facet_wrap(~Sex)
-
-summary(aov(FA1 ~ Ages*Sex*Group, data = adhd_combined_nt))
-
-```
-
-```{r}
-
-model = gam(TC1 ~ Group_Sex + s(Ages, by = Group_Sex, bs = "ts"), method = "ML", data = adhd_combined_nt)
-summary(model)
-
-plot_diff(model, view="Ages",         
-        comp=list(Group_Sex=c("ADHD Combined.Female", "Neurotypical.Female")),
-        main='Female Ages window(s) of significant difference(s): 5 - 9.7')
-
-ggplot(data= adhd_combined_nt, mapping = aes(fill = Group, y=FA1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("dodgerblue","red")) + 
-  scale_color_manual(values = c("dodgerblue","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) + facet_wrap(~Sex)
-
-
 
 ```
 
@@ -158,91 +71,20 @@ adhd_inatentive_nt <- df %>%
   mutate(Group = as.factor(Group)) %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
-model = gam(FA1 ~ Group + s(Ages, by = Group, bs = "ts", k =3), method = "ML", data = adhd_inatentive_nt)
-summary(model)
+ivnames = names(adhd_inatentive_nt)[22:26]
 
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("ADHD Inattentive", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 8')
+model <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group, list(i = as.name(x))), data = adhd_inatentive_nt)})
+sapply(model, car::Anova,simplify =  F)
 
-model = gam(FA2 ~ Group + s(Ages, by = Group, bs = "ts", k =3), method = "ML", data = adhd_inatentive_nt)
-summary(model)
+model_sex <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex, list(i = as.name(x))), data = adhd_inatentive_nt)})
+sapply(model_sex, car::Anova,simplify =  F)
 
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("ADHD Inattentive", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 8')
+model_sex_age <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex*Ages, list(i = as.name(x))), data = adhd_inatentive_nt)})
+sapply(model_sex_age, car::Anova,simplify =  F)
 
-
-model = gam(FA3 ~ Group + s(Ages, by = Group, bs = "ts", k =3), method = "ML", data = adhd_inatentive_nt)
-summary(model)
-
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("ADHD Inattentive", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 8')
-
-```
-
-```{r}
-
-ggplot(data= adhd_inatentive_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("green4","red")) + 
-  scale_color_manual(values = c("green4","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) 
-
-ggplot(data= adhd_inatentive_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("green4","red")) + 
-  scale_color_manual(values = c("green4","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) + facet_wrap(~Sex)
-
-
-
-summary(aov(FA1 ~ Group + Ages + Sex, data = adhd_inatentive_nt))
 ```
 
 # Anxiety 
@@ -256,83 +98,20 @@ anxiety_nt <- df %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
 
-model = gam(FA3 ~ Group + Sex + s(Ages, by = Group, bs = "ts", k=3), method = "REML", data = anxiety_nt)
-summary(model)
+ivnames = names(anxiety_nt)[22:26]
 
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("Anxiety", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 7.3')
+model <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group, list(i = as.name(x))), data = anxiety_nt)})
+sapply(model, car::Anova,simplify =  F)
 
+model_sex <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex, list(i = as.name(x))), data = anxiety_nt)})
+sapply(model_sex, car::Anova,simplify =  F)
 
-```
+model_sex_age <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex*Ages, list(i = as.name(x))), data = anxiety_nt)})
+sapply(model_sex_age, car::Anova,simplify =  F)
 
-```{r}
-
-ggplot(data= anxiety_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "tp"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("magenta4","red")) + 
-  scale_color_manual(values = c("magenta4","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) 
-
-
-model = gam(TC1 ~ Group_Sex + s(Ages, by = Group_Sex, bs = "ts", k=3), method = "REML", data = anxiety_nt)
-summary(model)
-
-plot_diff(model, view="Ages",         
-        comp=list(Group_Sex=c("Anxiety.Female", "Neurotypical.Female")),
-        main='Ages window(s) of significant difference(s): 5 - 7.2')
-
-ggplot(data= anxiety_nt, mapping = aes(fill = Group, y=FA1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("magenta4","red")) + 
-  scale_color_manual(values = c("magenta4","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) + facet_wrap(~Sex)
-
-summary(aov(FA2 ~ Ages*Sex*Group, data = anxiety_nt))
 ```
 
 # Autism with ADHD 
@@ -345,67 +124,20 @@ autism_nt <- df %>%
   mutate(Group = as.factor(Group)) %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
-model = gam(FA1 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_nt)
-summary(model)
+ivnames = names(autism_nt)[22:26]
 
+model <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group, list(i = as.name(x))), data = autism_nt)})
+sapply(model, car::Anova,simplify =  F)
 
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("ASD without ADHD", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 7 - 21')
+model_sex <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex, list(i = as.name(x))), data = autism_nt)})
+sapply(model_sex, car::Anova,simplify =  F)
 
+model_sex_age <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex*Ages, list(i = as.name(x))), data = autism_nt)})
+sapply(model_sex_age, car::Anova,simplify =  F)
 
-model = gam(FA2 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_nt)
-summary(model)
-
-
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("ASD without ADHD", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 7 - 21')
-
-
-model = gam(FA3 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_nt)
-summary(model)
-
-
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("ASD without ADHD", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 7 - 21')
-
-
-```
-
-```{r}
-
-ggplot(data= autism_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("orange2","red")) + 
-  scale_color_manual(values = c("orange2","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) 
-
-
-summary(aov(FA3 ~ Group + Ages + Sex, data = autism_nt))
 ```
 
 # Austism with ADHD 
@@ -418,97 +150,20 @@ autism_adhd_nt <- df %>%
   mutate(Group = as.factor(Group)) %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
+ivnames = names(autism_adhd_nt)[22:26]
 
-model = gam(FA1 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_adhd_nt)
-summary(model)
+model <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group, list(i = as.name(x))), data = autism_adhd_nt)})
+sapply(model, car::Anova,simplify =  F)
 
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("ASD with ADHD", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 7.2')
+model_sex <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex, list(i = as.name(x))), data = autism_adhd_nt)})
+sapply(model_sex, car::Anova,simplify =  F)
 
-model = gam(FA2 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_adhd_nt)
-summary(model)
+model_sex_age <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex*Ages, list(i = as.name(x))), data = autism_adhd_nt)})
+sapply(model_sex_age, car::Anova,simplify =  F)
 
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("ASD with ADHD", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 7.2')
-
-
-model = gam(FA3 ~ Group + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = autism_adhd_nt)
-summary(model)
-
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("ASD with ADHD", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 7.2')
-
-
-
-```
-
-```{r}
-ggplot(data= autism_adhd_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("grey47","red")) + 
-  scale_color_manual(values = c("grey47","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) 
-
-
-model = gam(TC1 ~ Group_Sex + s(Ages, by = Group_Sex, bs = "ts", k=3), method = "ML", data = autism_adhd_nt)
-summary(model)
-
-plot_diff(model, view="Ages",         
-        comp=list(Group_Sex=c("ASD with ADHD.Male", "Neurotypical.Male")),
-        main='Ages window(s) of significant difference(s): 5 - 7.5')
-
-ggplot(data= autism_adhd_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("grey47","red")) + 
-  scale_color_manual(values = c("grey47","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) + facet_wrap(~Sex)
 
 ```
 
@@ -522,63 +177,20 @@ depression_nt <- df %>%
   mutate(Group = as.factor(Group)) %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
-model = gam(FA1 ~ Group + Sex + s(Ages, by = Group, bs = "ts",  k=3), method = "ML", data = depression_nt)
-summary(model)
+ivnames = names(depression_nt)[22:26]
 
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("Depression", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 13.1')
+model <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group, list(i = as.name(x))), data = depression_nt)})
+sapply(model, car::Anova,simplify =  F)
 
-model = gam(FA2 ~ Group + Sex + s(Ages, by = Group, bs = "ts",  k=3), method = "ML", data = depression_nt)
-summary(model)
+model_sex <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex, list(i = as.name(x))), data = depression_nt)})
+sapply(model_sex, car::Anova,simplify =  F)
 
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("Depression", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 13.1')
+model_sex_age <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex*Ages, list(i = as.name(x))), data = depression_nt)})
+sapply(model_sex_age, car::Anova,simplify =  F)
 
-model = gam(FA3 ~ Group + Sex + s(Ages, by = Group, bs = "ts",  k=3), method = "ML", data = depression_nt)
-summary(model)
-
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("Depression", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 13.1')
-
-
-
-```
-
-```{r}
-
-ggplot(data= depression_nt, mapping = aes(fill = Group, y=FA3, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3, bs = "ts"), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("black","red")) + 
-  scale_color_manual(values = c("black","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) 
-
-
-summary(aov(FA2 ~ Group + Ages + Sex, data = depression_nt))
 ```
 
 # Learning Disorders 
@@ -591,130 +203,63 @@ learning_nt <- df %>%
   mutate(Group = as.factor(Group)) %>%
   mutate(Group_Sex = as.factor(interaction(Group, Sex)))
 
+ivnames = names(learning_nt)[22:26]
 
-model = gam(TC1 ~ Group + Sex + s(Ages, by = Group, bs = "ts", k=3), method = "ML", data = learning_nt)
-summary(model)
+model <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group, list(i = as.name(x))), data = learning_nt)})
+sapply(model, car::Anova,simplify =  F)
 
-plot_diff(model, view="Ages",         
-        comp=list(Group=c("Learning Disorder", "Neurotypical")),
-        main='Ages window(s) of significant difference(s): 5 - 9.3')
+model_sex <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex, list(i = as.name(x))), data = learning_nt)})
+sapply(model_sex, car::Anova,simplify =  F)
 
-ggplot(data= learning_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("steelblue2","red")) + 
-  scale_color_manual(values = c("steelblue2","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) 
+model_sex_age <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ Group*Sex*Ages, list(i = as.name(x))), data = learning_nt)})
+sapply(model_sex_age, car::Anova,simplify =  F)
 
-
-
-model = gam(TC1 ~ Group_Sex + s(Ages, by = Group_Sex, bs = "ts",  k=3), method = "ML", data = learning_nt)
-summary(model)
-
-plot_diff(model, view="Ages",         
-        comp=list(Group_Sex=c("Learning Disorder.Male", "Neurotypical.Male")),
-        main='Ages window(s) of significant difference(s): 5 - 7.5')
-
-ggplot(data= learning_nt, mapping = aes(fill = Group, y=TC1, x=Ages, color=Group)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = Group))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c("steelblue2","red")) + 
-  scale_color_manual(values = c("steelblue2","red")) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) + 
-  geom_point(alpha = .4) + facet_wrap(~Sex)
-
-summary(aov(FA3 ~ Group*Ages*Sex, data = learning_nt))
 ```
 
 
 ```{r}
 
-df_fa = df %>% select(URSI, FA1, FA2, FA3)
+cbcl <- read.csv("/Users/jacob.derosa/Documents/Github/Delay_Discounting/Data/CBCL_Cluster_df.csv") %>% select(URSI, cluster) %>% mutate(cluster = factor(cluster)) %>% inner_join(df)
+ivnames = names(cbcl)[23:27]
 
-Split_1 = read.csv("/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Temp_Cluster_All.csv", header = T, sep = ",") %>% inner_join(df_fa) %>% mutate(cluster= as.factor(cluster))
+model <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ cluster, list(i = as.name(x))), data = cbcl)})
+sapply(model, car::Anova,simplify =  F)
 
+model_sex <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ cluster*Sex, list(i = as.name(x))), data =cbcl)})
+sapply(model_sex, car::Anova,simplify =  F)
 
-
-model = gam(FA3 ~ cluster + s(Age, by = cluster, bs = "ts",  k=3), method = "REML", data = Split_1)
-summary(model)
-
-plot_diff(model, view="Age",         
-        comp=list(cluster=c("3", "4")),
-        main='Ages window(s) of significant difference(s): 5 - 7.5')
+model_sex_age <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ cluster*Sex*Ages, list(i = as.name(x))), data = cbcl)})
+sapply(model_sex_age, car::Anova,simplify =  F)
 
 
 ```
 
-```{r}
-col1 = RColorBrewer::brewer.pal(6, "Set1")
 
-ggplot(data= Split_1, mapping = aes(fill = cluster, y=FA3, x=Age, color=cluster)) + 
-  stat_smooth(method = "gam", formula = y ~ s(x, k = 3), size =1.5, fullrange = T, se = T, alpha = .2, (aes(color = cluster))) + 
-  scale_x_continuous(breaks=seq(5, 21, 4)) +
-  scale_y_continuous(breaks=seq(-2,2,1)) +
-  theme(axis.line = element_line(size=2, colour = "black"),
-        panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
-        panel.border = element_blank(), panel.background = element_blank()) +
-  theme(panel.grid.major = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=15, vjust=.5,),
-          axis.text.y = element_text(face="bold", color="black", 
-                           size=15),
-    axis.ticks.length=unit(0.3,"cm"),
-    axis.ticks.x=element_line(size=2),
-    axis.ticks.y=element_line(size=2)) + 
-  theme(legend.title = element_text(size = 14, face = "bold",), 
-    legend.text = element_text(size = 12, face = "bold",)) + 
-   scale_fill_manual(values = c(col1)) + 
-  scale_color_manual(values = c(col1)) +
-  expand_limits(x=c(5,21), y =c(-2,2)) +
-  labs(y = "Delay Discounting (PC1)", x = "Chronological Age") +
-  theme(axis.title.x = element_text(size=16, face="bold",),
-        axis.title.y = element_text(size=16, face="bold",),
-        title = element_text(size=14, face="bold",)) 
+```{r}
+
+fc_df = read.csv("/Users/jacob.derosa/Documents/Github/Delay_Discounting/Data/FC_Cluster_df.csv", header = T, sep =",") %>% mutate(cluster = factor(cluster)) %>% mutate(Sex = factor(Sex))
+
+ivnames = names(fc_df)[14:18]
+
+model <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ cluster, list(i = as.name(x))), data = fc_df)})
+sapply(model, car::Anova,simplify =  F)
+
+model_sex <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ cluster*Sex, list(i = as.name(x))), data = fc_df)})
+sapply(model_sex, car::Anova,simplify =  F)
+
+model_sex_age <- lapply(ivnames, function(x) {
+  lm(substitute(i ~ cluster*Sex*Ages, list(i = as.name(x))), data = fc_df)})
+sapply(model_sex_age, car::Anova,simplify =  F)
+
+
 
 ```
 

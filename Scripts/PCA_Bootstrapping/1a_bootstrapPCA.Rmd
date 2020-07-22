@@ -1,0 +1,619 @@
+---
+title: "1_bootstrapPCA"
+author: "Paul A. Bloom"
+date: "September 10, 2019"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(PCAmixdata)
+```
+
+```{r}
+#sub	site	tech	diag	age	sex	ext	int	tot	etiv	group
+all_data =  read.csv("C:/Users/jacob.derosa/Desktop/Scripts/temp_disc_df.csv", header = T, sep = ",")
+smri = all_data %>% select(R_10, R_1000, R_1000_Past, R_1000_Exp_0, R_1_Mil, R_Snack)
+
+```
+
+
+# standardize
+```{r}
+for (i in 1:ncol(smri)){
+  smri[,i] = (smri[,i] - mean(smri[,i]))/sd(smri[,i])
+}
+#Faster: pacct = pacct %>% mutate_at(4:ncol(.), scale)
+#Faster2: pacct[, 4:ncol(pacct)] = lapply(pacct[, 4:ncol(pacct)], scale) 
+```
+
+# Parallel Analysis
+```{r}
+library("paran")
+paran(smri, graph = TRUE)
+```
+# Bootstrap the PCA
+
+```{r}
+ncomp = 2
+nBoots = 1000
+bootFrame = data.frame(eigMat = rep(NA, nBoots), loadings = rep(NA, nBoots))
+#pacctNoLabels = dplyr::select(pacct, -GROUP,  -DEM_3_GENDER_CHILD, -IDENT_SUBID)
+for (i in 1:nBoots){
+  blah = FALSE
+  while (blah == FALSE){
+  ind = sample(1:nrow(smri), size = nrow(smri), replace = TRUE)
+  bootSamples = smri[ind, ]
+  if (!any(is.na(cor(bootSamples)))){
+    blah = TRUE
+    }
+  }
+  
+  pcaMix1 = psych::principal(bootSamples[, c("R_10", "R_1000", "R_1_Mil", "R_1000_Exp_0", "R_1000_Past", "R_Snack")], rotate="oblimin", nfactors=ncomp, scores=TRUE)
+  
+  
+  bootFrame$eigMat[i] = list(t(pcaMix1$Vaccounted[c(1, 3:4),]))
+  bootFrame$loadings[i] = list(matrix(as.numeric(pcaMix1$loadings), attributes(pcaMix1$loadings)$dim, dimnames=attributes(pcaMix1$loadings)$dimnames))
+  bootFrame$subPreds[i] = list(pcaMix1$scores)
+}
+
+
+#save(bootFrame, file = '/Users/aki.nikolaidis/git_repo/Working_scripts/CSTC/Structural_PCA/R_Pipeline/bootstrap_pca.rda')
+```
+
+# PCA on full sample as 'template'
+
+```{r}
+pcaFull =  psych::principal(smri[, c("R_10", "R_1000", "R_1_Mil", "R_1000_Exp_0", "R_1000_Past", "R_Snack")], rotate="oblimin", nfactors=ncomp, scores=TRUE)
+pcaFullSample = list(t(pcaFull$Vaccounted[c(1, 3:4),]), matrix(as.numeric(pcaFull$loadings), attributes(pcaFull$loadings)$dim, dimnames=attributes(pcaFull$loadings)$dimnames))
+
+#save(pcaFull, file = '/Users/aki.nikolaidis/git_repo/Working_scripts/CSTC/Structural_PCA/R_Pipeline/pcaFullSampleModel.rda')
+#save(pcaFullSample, file = '/Users/aki.nikolaidis/git_repo/Working_scripts/CSTC/Structural_PCA/R_Pipeline/pcaFullSample.rda')
+
+# create a *key* linking subject numbers in the model with PACCT subject numbers
+pcaFullScores = data.frame(pcaFull$scores)
+pcaFullScores$subject= row.names(pcaFullScores)
+pcaFullScores$URSI = all_data$URSI
+
+#save(pcaFullScores, file = '/Users/aki.nikolaidis/git_repo/Working_scripts/CSTC/Structural_PCA/R_Pipeline/pcaFullScoresKey.rda')
+```
+
+```{r}
+
+regularLoadings = pcaFullSample[[2]] %>%
+  as.data.frame() %>%
+  mutate(., vars = row.names(.)) %>%
+  tidyr::gather(., key = 'dimensions', value = 'loading', contains('TC'))
+
+regularLoadingsNotTidy = pcaFullSample[[2]]
+#save(regularLoadingsNotTidy, file = '../output/pcaFullLoadingsNotAbsValWideForm.rda')
+#save(regularLoadings, file = '../output/pcaFullLoadingsNotAbsVal.rda')
+ggplot(regularLoadings, aes(x = vars, y = loading)) +
+  geom_hline(yintercept = 0) +
+  geom_point() + 
+  facet_grid(~dimensions) + 
+  coord_flip() + 
+  theme_bw()
+
+
+
+
+
+```
+
+
+```{r}
+# Load in PCA fit to the full sample/extract loadings
+#load(file="../output/pcaFullSample.rda")
+loadings<-pcaFullSample[[2]]
+
+# Set number of PCs to match
+match_PCs<-2
+sub_loadings<-loadings[,1:match_PCs]
+  
+# Initialize lists for the loadings, eigenvalues, and subject-level predictions for each bootstrap
+pca_matching_loadings <-list()
+pca_matching_eig <-list()
+pca_matching_preds <-list()
+
+# Load in the the bootstrapped PCAs 
+#load(file = '../output/pcaBootstrap.rda')
+```
+
+# Run PCA Matching Algorithm
+
+For each bootstrap, match each of the 1st 10 PCs from the bootstrap to which every PC they are most similar to in the original PCA fit to the full sample. 
+
+```{r}
+for (k in 1:nrow(bootFrame)){
+  bootstrap_loadings<-bootFrame$loadings[[k]]
+  bootstrap_eig = bootFrame$eigMat[[k]]
+  bootstrap_preds = bootFrame$subPreds[[k]]
+  
+  # make a correlation matrix of full sample loadings and bootstrapped loadings (dims 1-matchPCs)
+  boot_sub_loadings<-bootstrap_loadings[,1:match_PCs]
+  loadings_mat<-cbind(sub_loadings,boot_sub_loadings)
+  cormat<-cor(loadings_mat, method='pearson')
+  
+  # Just pull correlations of bootstrap sample with full sample (not bootstrap-bootstrap, or full-full)
+  submat1<-cormat[(match_PCs+1):(match_PCs*2),1:match_PCs]
+  
+  
+  # Match by the highest correlation
+  # Iterating across columns (the bootstrap PCs to find the best row match (the full sample PCs))
+  i<-1
+  orderVector<-vector()
+  for (i in (1:match_PCs)){
+    var<- which.max(submat1[,i]) #which max row for column i
+    submat1[var,]<- -2 # set the matching row to -2 so no other boot PCs will be matched with it
+    orderVector<-c(orderVector,var)
+  }
+  
+  # Reorganize the dimensions for loadings, eigenvalues, and subject predictions based on matched PCs
+  reorg_boot<-boot_sub_loadings[,c(orderVector)]
+  reorg_boot_eig = bootstrap_eig[c(orderVector),]
+  reorg_boot_preds = bootstrap_preds[,c(orderVector)]
+  
+  # Save into output list
+  pca_matching_loadings[[k]]<-reorg_boot
+  pca_matching_eig[[k]] = reorg_boot_eig
+  pca_matching_preds[[k]] = reorg_boot_preds
+}
+
+#save(pca_matching_loadings, pca_matching_eig, pca_matching_preds,file="../output/matched_pca.rda")
+```
+
+Prep bootstrap matching for plots
+```{r}
+#load('../output/matched_pca.rda')
+#load('../output/pcaFullSample.rda')
+
+fullSampLoadings = data.frame(pcaFullSample[[2]])
+fullSampLoadings$vars = row.names(fullSampLoadings)
+
+
+fullSampLoadingsLong = fullSampLoadings %>%
+  tidyr::gather(., key = 'dimension', value = 'loading', TC1:TC2) %>%
+  mutate(., dimension = as.numeric(gsub('TC', '', dimension)))
+
+# Loop through to put pca_matching list object into big dataframe
+for (i in 1:length(pca_matching_loadings)){
+  tmp = data.frame(pca_matching_loadings[[i]])
+  names(tmp) = paste0('dim', 1:ncol(tmp))
+  tmp$vars = row.names(tmp)
+  tmp$iter = i
+  if (i == 1){
+    bootMatch = tmp 
+  }
+  else{
+    bootMatch = rbind(bootMatch, tmp)
+  }
+}
+
+# put bootMatch in long form, then summarize
+bootMatchSummary = bootMatch %>%
+  tidyr::gather(., key = 'dimension', value = 'loading', dim1:dim2) %>%
+  dplyr::mutate(., dimension = as.numeric(gsub('dim', '', dimension))) %>%
+  dplyr::group_by(vars, dimension) %>%
+  dplyr::summarise(meanLoad = mean(loading),
+                   sdLoad = sd(loading),
+                   coefVar = meanLoad/sdLoad,
+            lwr95 = quantile(loading, probs = .025),
+            upr95 = quantile(loading, probs = .975),
+            lwr80 = quantile(loading, probs = .1),
+            upr80 = quantile(loading, probs = .9))
+```
+
+# Quick permutation test to make a null baseline for correlations -- not sure about the thresholding yet
+```{r}
+nPerms = 10000
+corVec = rep(NA, nPerms) 
+for (jj in 1:nPerms){
+  var1 = rnorm(n = nrow(smri))
+  var2 = rnorm(n = nrow(smri))
+  corVec[jj] = cor(var1, var2)
+}
+hist(abs(corVec))
+
+# make the boundary the 99% percentile?
+boundary = quantile(abs(corVec), prob = .99)
+
+#load('../output/pcaFullLoadingsNotAbsVal.rda')
+regularLoadings = mutate(regularLoadings, dimension = parse_number(dimensions)) %>%
+  select(-dimensions) %>%
+  left_join(., bootMatchSummary, by = c('vars', 'dimension')) %>%
+  mutate(., stable = ifelse(meanLoad > boundary, 'Stable', 'Unstable'))
+
+loadingsNoAbsValPlot = ggplot(regularLoadings, aes(x = vars, y = loading, color = stable)) +
+  geom_hline(yintercept = 0) +
+  geom_point() + 
+  facet_grid(~dimension) + 
+  coord_flip() + 
+  theme_bw() 
+
+#ggsave(loadingsNoAbsValPlot, height = 8, width = 12, file = '../plots/pcaLoadingFullNotAbsoluteValuedStability.png')
+```
+
+
+
+Make plots 
+```{r}
+# Also save out bootstrap matching loadings for the 2-way clustering
+bootMatchLoadingsFor2WayClust = bootMatchSummary %>%
+  dplyr::select(., vars, dimension, meanLoad) %>%
+  tidyr::spread(key = dimension, value = meanLoad)
+
+#save(bootMatchLoadingsFor2WayClust, bootMatchSummary, fullSampLoadingsLong, file = '../output/bootstrapLoadingMeans.rda')
+```
+
+# Plots of subject-level scores on PCs 1-3
+```{r}
+# Loop through to put subject-level scores all in one data frame
+for (i in 1:length(pca_matching_preds)){
+  tmp = data.frame(pca_matching_preds[[i]])
+  names(tmp) = paste0('dimBoot', 1:ncol(tmp))
+  tmp$subject = floor(as.numeric(row.names(tmp)))
+  tmp$iter = i
+  if (i == 1){
+    bootMatchPreds = tmp 
+  }
+  else{
+    bootMatchPreds = rbind(bootMatchPreds, tmp)
+  }
+}
+
+# load in key and orig scores
+#load('../output/pcaFullScoresKey.rda')
+
+pcaFullScores$subject = as.numeric(pcaFullScores$subject)
+
+# Generate summary dataframe
+bootMatchPredSummary = bootMatchPreds %>%
+  tidyr::gather(., key = 'dimension', value = 'prediction', dimBoot1:dimBoot2) %>%
+  group_by(dimension, subject) %>%
+  summarise(meanPred = mean(prediction)) %>%
+  tidyr::spread(key = dimension, value = meanPred) %>%
+  left_join(., pcaFullScores) #%>%
+  #left_join(., smri)
+
+# corrplot only first 5 dimensions
+bootMatchPredsFirst5Cor = dplyr::select(bootMatchPredSummary, contains('boot'), TC1:TC2) %>%
+  cor() %>%
+  corrplot(type = 'lower')
+
+# recode gender variable for plots
+#bootMatchPredSummary$gender = dplyr::recode(bootMatchPredSummary$DEM_3_GENDER_CHILD, '0' = 'male', '1' ='female')
+
+# write out subject-level loadings to csv, for comparison with factor analysis
+#bootstrapPCASubjectLoadings = bootMatchPredSummary %>%
+#  dplyr::select(contains('Boot'), GROUP, gender, IDENT_SUBID)
+
+#write.csv(bootstrapPCASubjectLoadings, file = '../output/bootstrapPCASubjectLoadings.csv', row.names = FALSE)
+```
+
+# Scree plots with confidence!!
+
+```{r}
+for (i in 1:length(pca_matching_eig)){
+  tmp = data.frame(pca_matching_eig[[i]])
+  tmp$dimension = as.numeric(gsub('TC', '', row.names(tmp)))
+  tmp$iter = i
+  if (i == 1){
+    bootMatchEig = tmp 
+  }
+  else{
+    bootMatchEig = rbind(bootMatchEig, tmp)
+  }
+}
+
+
+
+bootMatchEigSummary = bootMatchEig %>%
+  group_by(dimension) %>% 
+  rename(Eigenvalue = SS.loadings) %>%
+  rename(Proportion = Proportion.Explained) %>%
+  rename(Cumulative = Cumulative.Var) %>%
+  mutate(Cumulative = Cumulative * 100) %>%
+  summarise(meanEig= mean(Eigenvalue),
+            eigLwr95 = quantile(Eigenvalue, probs = .025),
+            eigUpr95 = quantile(Eigenvalue, probs = .975),
+            eigLwr80 = quantile(Eigenvalue, probs = .1),
+            eigUpr80 = quantile(Eigenvalue, probs = .9),
+            meanProp= mean(Proportion),
+            propLwr95 = quantile(Proportion, probs = .025),
+            propUpr95 = quantile(Proportion, probs = .975),
+            propLwr80 = quantile(Proportion, probs = .1),
+            propUpr80 = quantile(Proportion, probs = .9),
+            meanCumulative= mean(Cumulative),
+            cumulativeLwr95 = quantile(Cumulative, probs = .025),
+            cumulativeUpr95 = quantile(Cumulative, probs = .975),
+            cumulativeLwr80 = quantile(Cumulative, probs = .1),
+            cumulativeUpr80 = quantile(Cumulative, probs = .9))
+
+# Eigenvalue plot
+screeEig = ggplot(data = bootMatchEigSummary, aes(x = dimension, y = meanEig)) +
+  geom_errorbar(aes(ymin = eigLwr95, ymax = eigUpr95), alpha = .7, width = .05) +
+  geom_errorbar(aes(ymin = eigLwr80, ymax = eigUpr80), width = 0, lwd = 1) +
+  geom_point(size = 2, color = 'purple') +
+  scale_x_continuous(labels = 1:10, breaks = 1:10) +
+  theme_bw() +
+  labs(x = 'PC', y = 'Eigenvalue', title = 'Scree Plot From Matching Boostrap (SS Loadings)') +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+
+# Proportion variance explained plot
+screeProp = ggplot(data = bootMatchEigSummary, aes(x = dimension, y = meanProp)) +
+  geom_errorbar(aes(ymin = propLwr95, ymax = propUpr95), alpha = .7, width = .05) +
+  geom_errorbar(aes(ymin = propLwr80, ymax = propUpr80), width = 0, lwd = 1) +
+  geom_point(size = 2, color = 'purple') +
+  scale_x_continuous(labels = 1:10, breaks = 1:10) +
+  theme_bw() +
+  labs(x = 'PC', y = 'Proportion Variance Explained', title = 'Scree Plot From Matching Boostrap (Proportion Variance)') +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+
+# Cumulative proportion variance explained plot
+screeCumulative = ggplot(data = bootMatchEigSummary, aes(x = dimension, y = meanCumulative)) +
+  geom_line() + 
+  geom_errorbar(aes(ymin = cumulativeLwr95, ymax = cumulativeUpr95), alpha = .7, width = .05) +
+  geom_errorbar(aes(ymin = cumulativeLwr80, ymax = cumulativeUpr80), width = 0, lwd = 1) +
+  geom_point(size = 2, color = 'purple') +
+  theme_bw() +
+  scale_x_continuous(labels = 1:10, breaks = 1:10) +
+  labs(x = 'PC', y = 'Cumulative Proportion Variance Explained', title = 'Scree Plot From Matching Boostrap (Cumulative Variance)') +
+  ylim(0,100) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+
+screeEig
+screeProp
+screeCumulative
+
+#ggsave(screeEig, file = '../plots/screeEigenvaluesPCA_MatchBoostrap.png')
+#ggsave(screeProp, file = '../plots/screePropVariancePCA_MatchBoostrap.png')
+#ggsave(screeCumulative, file = '../plots/screeCumulativeVariancePCA_MatchBoostrap.png')
+
+
+```
+
+```{r}
+# read in PCA loadings onto each of the variables
+#load('../output/pcaFullSample.rda')
+#load('../output/pcaFullLoadingsNotAbsValWideForm.rda')
+#load('../output/bootstrapLoadingMeans.rda')
+#pacct = read.csv('../../cleanData/CleanedEarlyLifeVariables.csv', stringsAsFactors = FALSE) %>%
+#  filter(., GROUP != 'C')
+# Clean up loadings into right format
+loadings = regularLoadingsNotTidy
+bootLoadings = bootMatchLoadingsFor2WayClust %>%
+  ungroup() %>%
+  dplyr::select(., -vars)
+
+nComponentsFull = ncol(regularLoadingsNotTidy)
+
+# Make them the same number of components
+bootLoadings = bootLoadings[, 1:nComponentsFull]
+nComponentsBoot = ncol(bootLoadings)
+
+# Set rownames
+row.names(bootLoadings) = bootMatchLoadingsFor2WayClust$vars
+
+# save variable names
+vars = row.names(loadings)
+bootVars = bootMatchLoadingsFor2WayClust$vars
+```
+
+```{r}
+
+# run cluster/heatmatp function
+
+sortings = TwoWayclust(t(loadings))
+#pdf(file=paste0('../plots/2wayClust',nComponentsFull, 'DimsFull.pdf'), width = 10)
+sortingVis = TwoWayclust((loadings))
+#dev.off()
+
+# cluster/heatmap with boostrapped absolute value loadings
+bootSorting = TwoWayclust(t(bootLoadings))
+
+#pdf(file=paste0('../plots/2wayClustBootstrapAbsValLoadings', nComponentsBoot, 'Dims.pdf'), width = 10)
+bootSortingVisual = TwoWayclust(bootLoadings)
+#dev.off()
+
+# pull colors (denoting variable clusters)
+colors = sortings[[2]]
+colorsBoot = bootSorting[[2]]
+```
+
+```{r}
+
+# pull ordering of variables (how the cluster together) and wrangle to order factors
+varOrderList = vars[sortings[[1]]$colInd]
+loadings = data.frame(loadings)
+loadings = loadings[sortings[[1]]$colInd,]
+loadings$ind = 1:nrow(loadings)
+loadings$var = varOrderList
+loadings$varGroup = factor(colors[sortings[[1]]$colInd])
+
+bootVarOrderList = bootVars[bootSorting[[1]]$colInd]
+bootLoadings = data.frame(bootLoadings)
+bootLoadings = bootLoadings[bootSorting[[1]]$colInd,]
+bootLoadings$ind = 1:nrow(bootLoadings)
+bootLoadings$var = bootVarOrderList
+bootLoadings$varGroup = factor(colorsBoot[bootSorting[[1]]$colInd])
+```
+
+```{r}
+# put in long form for plotting -- just take first 3 dims
+
+loadLong = tidyr::gather(loadings, key = 'pc', value = 'val', contains('TC')) %>%
+  mutate(., dimNum = as.numeric(gsub('TC', '', pc)))
+
+loadLongBoot = tidyr::gather(bootLoadings, key = 'pc', value = 'val', contains('X')) %>%
+  mutate(., dimNum = as.numeric(gsub('X', '', pc)))
+
+```
+
+```{r}
+# color pallette stuff for the plot
+getColors <- brewer_pal(type = 'qual', palette = 2) # Create a function that takes a number and returns a qualitative palette of that length (from the scales package)
+numColors <- length(unique(loadings$varGroup)) # How many colors you need
+myPalette <- getColors(numColors)
+names(myPalette) <- levels(loadings$varGroup) # Give every color an appropriate name
+# Colors for bootstrapped version
+numColorsBoot <- length(unique(bootLoadings$varGroup)) # How many colors you need
+myPaletteBoot <- getColors(numColorsBoot)
+names(myPaletteBoot) <- levels(bootLoadings$varGroup) # Give every color an appropriate name
+```
+
+```{r}
+# reorder var column 
+loadLong$var = ordered(loadLong$var, levels = varOrderList)
+loadLongBoot$var = ordered(loadLongBoot$var, levels = bootVarOrderList)
+
+#save(loadLong, loadLongBoot, file = '../output/orderedLoadings.rda')
+
+
+# make radar plot
+#radarFullSample = 
+dplyr::filter(loadLong, dimNum <=5) %>%
+  mutate(., dimNum = factor(dimNum)) %>%
+  ggplot(data = .,  aes(x=var, y=val, group=dimNum, colour=dimNum)) + 
+  geom_point(size=2) + 
+  geom_line() + 
+  geom_hline(aes(yintercept=0), lwd=1, lty=2) + 
+  scale_x_discrete() +
+  theme_bw() +
+  labs(title = 'PCA Variable Loadings -- Full Sample PCA Fit') +
+  coord_polar() +
+  geom_ribbon(aes(ymax = val, ymin = 0, fill = dimNum), alpha = .2) +
+  theme(axis.text.x = element_text(colour=myPalette[loadings$varGroup]))
+
+
+
+
+```
+# alternative to radar plot --- bootstrapped
+```{r}
+#bootTwoWayClusterAllPCLoadings = 
+dplyr::filter(loadLongBoot, dimNum < 5) %>%
+  mutate(., dimNum = factor(dimNum)) %>%
+  ggplot(data = .,  aes(x=var, y=val, group=dimNum, colour=dimNum)) + 
+  geom_hline(yintercept = 0, lty = 3, color = 'purple') +
+  geom_point(size=2) + 
+  geom_line() + 
+  scale_x_discrete() +
+  theme_bw() +
+  labs(title = 'PCA Variable Loadings -- Bootstrapping', y = 'Absolute Value Loadings') +
+  theme(axis.text.x = element_text(colour=myPaletteBoot[bootLoadings$varGroup], angle = 90),
+        text = element_text(face = 'bold')) 
+
+
+
+
+```
+# alternative to radar plot
+```{r}
+#fullSampleNoAbsValTwoWayClusterAllPCLoadings = 
+
+dplyr::filter(loadLong, dimNum <=5) %>%
+  mutate(., dimNum = factor(dimNum)) %>%
+  ggplot(data = .,  aes(x=var, y=val, group=dimNum, colour=dimNum)) + 
+  geom_hline(yintercept = 0, lty = 2, lwd =2) +
+  geom_point(size=2) + 
+  geom_line(lwd = 2) + 
+  scale_x_discrete() +
+  theme_bw() +
+  labs(title = 'PCA Variable Loadings (full sample PCA fit)', y = 'Loading') +
+  theme(axis.text.y = element_text(colour=myPalette[loadings$varGroup]),
+        text = element_text(face = 'bold')) +
+  coord_flip()
+
+
+
+
+
+# save plots
+#ggsave(bootTwoWayClusterAllPCLoadings, width = 15, height = 10, file = paste0('../plots/boostrap' , nComponentsBoot, 'PCs_twoWayClusterLoadings.png'))
+#ggsave(radarFullSample, width = 15, height = 10, file = '../plots/fullSampleFitRadarPlot.png')
+#ggsave(fullSampleNoAbsValTwoWayClusterAllPCLoadings, width = 15, height = 10, file = #paste0('../plots/fullSamplePCFit_twoWayCluster', nComponentsFull, 'PCsLoadings.png'))
+```
+
+```{r}
+
+# Bootstrapped loadings with ordering
+
+# regroup variables by 2-way clustering
+loadLongBoot = mutate(loadLongBoot, dimension = dimNum,
+                      vars = as.character(var),
+                      varCluster = var)
+
+bootMatchSummary = left_join(bootMatchSummary, loadLongBoot, by = c('vars', 'dimension'))
+
+loadingBootMatchPlot = dplyr::filter(bootMatchSummary, dimension <= 5) %>%
+  ggplot(., aes(x = varCluster, y = meanLoad, color = varGroup)) +
+  geom_hline(yintercept =0, color = 'red', lwd = .5) +
+  geom_errorbar(aes(ymin = lwr95, ymax = upr95), width = 0, alpha = .5) +
+  geom_errorbar(aes(ymin = lwr80, ymax = upr80), width = 0, lwd = 1) +
+  geom_point() +
+  geom_point(data = fullSampLoadingsLong, aes(x = vars, y = loading), color = 'black', size = .5) +
+  facet_grid(~dimension) +
+  coord_flip() +
+  theme_bw() +
+  labs(title = 'Bootsrap (w/matching) Distributions of Variable loadings on PC 1-5\nBlack points are loadings from PCA fit to full sample', y = 'Abs. Value Loading', x = '') +
+  scale_color_brewer(palette = 'Set1') +
+  theme(legend.position = 'none')
+
+#ggsave(loadingBootMatchPlot, height = 8, width = 12, file = '../plots/pcaLoadingBootMatchPlot.png')
+
+```
+
+
+# Not absolute valued/bootstrapped
+```{r}
+nPerms = 10000
+corVec = rep(NA, nPerms) 
+for (jj in 1:nPerms){
+  var1 = rnorm(n = nrow(smri))
+  var2 = rnorm(n = nrow(smri))
+  corVec[jj] = cor(var1, var2)
+}
+hist(abs(corVec))
+
+# make the boundary the 99% percentile?
+boundary = quantile(abs(corVec), prob = .99)
+
+#load('../output/pcaFullLoadingsNotAbsVal.rda')
+
+```
+
+```{r}
+
+loadLong = mutate(loadLong, dimension = dimNum,
+                  vars = as.character(var),
+                  varCluster = var)
+
+bootMatchSummaryRegular = left_join(regularLoadings, loadLong, by = c('vars', 'dimension'))
+
+```
+
+```{r}
+
+noBootVarSummary = bootMatchSummaryRegular %>%
+  dplyr::group_by(varCluster) %>%
+  dplyr::summarise(varGroup = varGroup[1]) 
+
+loadingsNoAbsValPlot = ggplot(bootMatchSummaryRegular, aes(x = varCluster, y = loading, color = stable)) +
+  geom_hline(yintercept = 0, lty = 3, alpha = .8) +
+  geom_point() + 
+  facet_grid(~dimension) + 
+  coord_flip() + 
+  theme_bw() +
+  theme(axis.text.y = element_text(color = noBootVarSummary$varGroup)) +
+  scale_color_brewer(palette = 'Set1') +
+  theme(text = element_text(face = 'bold')) +
+  labs(y = 'Loading', x = 'Variables - In Order of 2Way Clustering', title = 'Loadings - Not Abs Valued') +
+  theme(panel.border = element_rect(colour = "black", size=2))
+
+loadingsNoAbsValPlot
+
+```
+
