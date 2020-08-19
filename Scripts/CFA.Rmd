@@ -1,7 +1,8 @@
 ---
 author: "Confirmatory Factor Analyses"
-
 output:
+  word_document:
+    toc: yes
   html_document:
     number_sections: yes
     toc: yes
