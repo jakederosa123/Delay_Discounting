@@ -32,7 +32,7 @@ CBCL_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/CBCL_r8.csv"
 
 Temp_Disc_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Temp_Disc_r8.csv", header =T, sep = ",")
 
-Basic_Demos_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Basic_Demos_r8.csv", header =T, sep = ",")
+Basic_Demos_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Basic_Demos_r8.csv", header =T, sep = ",") %>% select(URSI, Age)
 
 ```
 
@@ -50,23 +50,28 @@ Temp_Disc <- Temp_Disc_r8 %>%
 
 Temp_Disc[,2:7] <- log(Temp_Disc[,2:7]) 
 
-domain_data = Temp_Disc[,2:7]
+X = merge(Temp_Disc, Basic_Demos_r8, by = c("URSI")) %>% filter(Age <= 18)
+domain_data = X[,2:7]
+```
 
-omega(Temp_Disc[2:7])
+```{r}
+#omega(domain_data[2:7])
 ```
 
 ```{r, echo = F}
 
-dom_polycor = cor(domain_data)
+dom_polycor = hetcor(domain_data)
 
-dom_par_analysis <- fa.parallel(dom_polycor, n.obs = nrow(domain_data), n.iter = 1000, error.bars = TRUE)
+dom_par_analysis <- fa.parallel(dom_polycor$correlations, n.obs = nrow(domain_data), n.iter = 1000, error.bars = TRUE)
 
-vss(dom_polycor, n.obs = nrow(domain_data), rorate ="oblimin")
+vss(dom_polycor$correlations, n.obs = nrow(domain_data), rorate ="promax")
 
 NumFactors <- dom_par_analysis$nfact
 
-FA <- psych::fa(r = dom_polycor, n.obs = nrow(domain_data), nfactors = NumFactors, scores="Bartlett",rotate = 'oblimin')
 
+FA <- psych::fa(r = dom_polycor$correlations, n.obs = nrow(domain_data), nfactors = NumFactors, rotate = 'Promax', fm = "pa", scores = "Bartlett")
+
+FA
 
 ```
 
@@ -189,8 +194,9 @@ for (i in 1:nBoots){
     }
   }
   # run the factor analysis on bootstrapped sample
-  boot_corr <- cor(bootSamples)
-  FABoot <- fa(r = boot_corr, n.obs = nrow(domain_matrix), nfactors = NumFactors, scores = "Bartlett", rotate = 'oblimin')
+  boot_corr <- hetcor(bootSamples)
+
+  FABoot <- fa(r = boot_corr$correlations, n.obs = nrow(domain_matrix), nfactors = NumFactors, rotate = 'Promax', fm = "pa", scores = "Bartlett")
   
   # get eigenvalues ... 1 per number of dimensions
   FABoot_eigen <- data.frame(FABoot$e.values)

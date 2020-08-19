@@ -1,0 +1,160 @@
+---
+author: "Confirmatory Factor Analyses"
+
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = F, message = F}
+#load libraries 
+library(pander)
+require(car)
+require(dplyr) 
+require(ggplot2) 
+require(sjstats) 
+require(broom) 
+require(emmeans) 
+library(CGPfunctions)
+library(tidyr)
+library(psych)
+library(knitr)
+library(lavaan)
+library(polycor)
+
+```
+
+```{r, echo = F}
+#import data 
+Diagnosis <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Diagnosis.csv", header = T, sep = ",")
+
+CBCL_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/CBCL_r8.csv", header =T, sep = ",")
+
+Temp_Disc_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Temp_Disc_r8.csv", header =T, sep = ",")
+
+Basic_Demos_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Basic_Demos_r8.csv", header =T, sep = ",") %>% select(URSI, Age)
+
+```
+
+```{r, echo = F}
+
+Temp_Disc <- Temp_Disc_r8 %>%
+  select(URSI, ends_with("_k")) %>%
+  rename(R_10 = Temp_Disc_run1_k) %>%
+  rename(R_1000 = Temp_Disc_run2_k) %>%
+  rename(R_1_Mil = Temp_Disc_run3_k) %>%
+  rename(R_1000_Past = Temp_Disc_run4_k) %>%
+  rename(R_1000_Exp_0 = Temp_Disc_run5_k) %>%
+  rename(R_Snack = Temp_Disc_run6_k) %>%
+  na.omit(.)
+
+Temp_Disc[,2:7] <- log(Temp_Disc[,2:7]) 
+
+X = merge(Temp_Disc, Basic_Demos_r8, by = c("URSI")) %>% filter(Age < 18)
+
+domain_data = X[,2:7]
+
+```
+
+```{r, echo = F, include = F}
+
+dom_polycor = hetcor(domain_data)
+
+dom_par_analysis <- fa.parallel(dom_polycor$correlations, n.obs = nrow(domain_data), n.iter = 1000, error.bars = TRUE)
+
+
+NumFactors <- dom_par_analysis$nfact
+
+```
+
+# Three Factor 
+```{r, echo = F}
+
+FA <- psych::fa(r = dom_polycor$correlations, n.obs = nrow(domain_data), nfactors = NumFactors, rotate = 'Promax', fm = "pa", scores = "Bartlett")
+
+FA
+
+```
+
+## CFA 
+```{r, echo = F}
+cfa_model <- 'Factor1 =~ R_1_Mil + R_1000_Exp_0
+Factor2 =~ R_Snack + R_10
+FActor3 =~ R_1000_Past + R_1000'
+
+cfa_fit_3f <- cfa(model = cfa_model, data = domain_data)
+summary(cfa_fit_3f, fit.measures = TRUE)
+
+
+```
+
+# Two Factor
+```{r, echo = F}
+
+FA <- psych::fa(r = dom_polycor$correlations, n.obs = nrow(domain_data), nfactors = 2, rotate = 'Promax', fm = "pa", scores = "Bartlett")
+
+FA
+```
+
+## CFA 
+```{r,echo=F}
+cfa_model2 <- 'Factor1 =~ R_1_Mil + R_1000_Exp_0 + R_1000 + R_1000_Past
+FActor2 =~ R_10 + R_Snack'
+
+cfa_fit_2f <- cfa(model = cfa_model2, data = domain_data)
+summary(cfa_fit_2f, fit.measures = TRUE)
+
+
+```
+
+# One Factor
+```{r, echo = F}
+
+FA <- psych::fa(r = dom_polycor$correlations, n.obs = nrow(domain_data), nfactors = 1, rotate = 'Promax', fm = "pa", scores = "Bartlett")
+
+FA
+
+```
+
+## CFA
+```{r, echo = F}
+cfa_model1 <- ' Factor1 =~ R_1000 + R_1_Mil + R_1000_Exp_0 + R_10 + R_1000_Past + R_Snack'
+
+cfa_fit_1f <- cfa(model = cfa_model1, data = domain_data)
+summary(cfa_fit_1f, fit.measures = TRUE)
+
+```
+
+# ANOVA
+```{r, echo = F, include = F}
+
+anova(cfa_fit_3f, cfa_fit_2f)
+anova(cfa_fit_3f, cfa_fit_1f)
+anova(cfa_fit_2f, cfa_fit_1f)
+
+anova_frame = data.frame("Three_Factor" = c("","0.0003811 ***","1.825e-06 ***"), 
+                         "Two_Factor" = c("","","0.000217 ***"), 
+                         "One_Factor" = c("","",""), stringsAsFactors = F)
+row.names(anova_frame) = colnames(anova_frame)
+anova_frame = anova_frame[2:3,]
+anova_frame = anova_frame[,1:2]
+
+
+```
+
+# Multilevel Model Fit Comarison
+
+```{r, echo = F}
+
+anova_frame %>%
+  kable(format="pandoc", caption="Multilevel Model Fit Comarison")
+
+```
