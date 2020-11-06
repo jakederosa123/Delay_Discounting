@@ -1,0 +1,262 @@
+---
+title: "Scipt Cleaning"
+author: "Jacob DeRosa"
+date: "5/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = F, message = F}
+
+library(pander)
+library(car)
+library(dplyr) 
+library(ggplot2) 
+library(sjstats) 
+library(broom) 
+library(emmeans) 
+library(CGPfunctions)
+library(tidyr)
+library(psych)
+library(lavaan)
+library(plot3D)
+library(polycor)
+library(semPlot)
+
+```
+
+# Import Data
+```{r, echo = F}
+
+Diagnosis <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Diagnosis.csv", header = T, sep = ",")
+CBCL_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Release8/CBCL_r8.csv", header =T, sep = ",")
+Temp_Disc_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Release8/Temp_Disc_r8.csv", header =T, sep = ",")
+Basic_Demos_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Release8/Basic_Demos_r8.csv", header =T, sep = ",") %>% select(URSI, Age, Sex, Study_Site)
+
+```
+
+# Clean Temp Disc
+```{r, echo = F}
+
+Temp_Disc <- Temp_Disc_r8 %>%
+  select(URSI, ends_with("_k")) %>%
+  rename(R_10 = Temp_Disc_run1_k) %>%
+  rename(R_1000 = Temp_Disc_run2_k) %>%
+  rename(R_1_Mil = Temp_Disc_run3_k) %>%
+  rename(R_1000_Past = Temp_Disc_run4_k) %>%
+  rename(R_1000_Exp_0 = Temp_Disc_run5_k) %>%
+  rename(R_Snack = Temp_Disc_run6_k) %>%
+  na.omit(.)
+
+Temp_Disc[,2:7] <- log(Temp_Disc[,2:7]) #Log transform K 
+
+df = merge(Temp_Disc, Basic_Demos_r8, by = c("URSI")) %>% filter(Age <= 18)
+
+```
+
+# Adding Diagnosis
+```{r, echo = F}
+
+df = merge(Diagnosis, df, by = c("URSI")) %>%
+  rename(ADHD = `Attention.Deficit.Hyperactivity.Disorder`) %>%
+  rename(ANX = `Anxiety.Disorders`) %>%
+  rename(ASD = `Autism.Spectrum.Disorder`) %>%
+  rename(DEP = `Depressive.Disorders`) %>%
+  rename(NT = `No.Diagnosis.Given`) %>%
+  rename(LD = Learning_Disorder) %>%
+  rename(ADHD_C = ADHD.Combined.Type) %>%
+  rename(ADHD_I = ADHD.Inattentive.Type) %>%
+  rename(ADHD_H = ADHD.Hyperactive.Impulsive.Type) %>%
+  rename(ODD = Oppositional.Defiant.Disorder) %>% 
+  mutate(ADHD_C_NA = ifelse(ADHD_C == 1 & ASD != 1, "1", "0")) %>%
+  mutate(ADHD_I_NA = ifelse(ADHD_I == 1 & ASD != 1, "1", "0"))%>% 
+  mutate(ASD_NA = ifelse(ASD == 1 & ADHD !=1, "1", "0")) %>% 
+  mutate(ASD_ADHD = ifelse(ADHD == 1 & ASD == 1, "1", "0")) %>%
+  select(-X, -starts_with("Specific"))
+
+```
+
+# FSQ 
+```{r}
+
+FSQ = read.csv("C:/Users/jacob.derosa/Documents/NVLD/Release8/FSQ_r8.csv", stringsAsFactors=FALSE) %>% select(URSI, FSQ_04) %>% 
+  filter(FSQ_04 != 12) %>% 
+  mutate(Income = ifelse(FSQ_04 == 11, "High",
+                         ifelse(FSQ_04 >= 4 & FSQ_04 <= 10, "Medium", 
+                                ifelse(FSQ_04 < 4, "Low", NA))))
+
+write.csv(FSQ, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/FSQ.csv", row.names = F)
+
+```
+
+# IQ 
+```{r}
+
+wais_iq = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Release8/WAIS_r8.csv", header = T, sep = ",") %>% select(URSI, WAIS_FSIQ_COMP) %>% na.omit() 
+wisc_iq = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Release8/WISC_r8.csv", header = T, sep = ",") %>% select(URSI, WISC_FSIQ) %>% na.omit()
+wasi_iq = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Release8/WASI_r8.csv", header = T, sep = ",") %>% select(URSI, WASI_FSIQ) %>% na.omit()
+kbit_iq = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Release8/KBIT_r8.csv", header = T, sep = ",") %>% select(URSI, KBIT_IQ_Comp) %>% na.omit()
+
+WASI_WISC = merge(wasi_iq, wisc_iq, by = c("URSI")) %>% select(-WASI_FSIQ) %>% rename(IQ = WISC_FSIQ)
+KBIT_WSIC = merge(wisc_iq, kbit_iq, by = c("URSI")) %>% select(-KBIT_IQ_Comp) %>% rename(IQ = WISC_FSIQ)
+
+wais_iq = wais_iq %>% rename(IQ = WAIS_FSIQ_COMP)
+wisc_iq = wisc_iq %>% rename(IQ = WISC_FSIQ)
+wasi_iq = wasi_iq %>% rename(IQ = WASI_FSIQ)
+kbit_iq = kbit_iq %>% rename(IQ = KBIT_IQ_Comp)
+
+IQ = rbind(WASI_WISC, WASI_WISC, wisc_iq, wasi_iq, wais_iq, kbit_iq)
+IQ = IQ[!duplicated(IQ$URSI),]
+
+write.csv(IQ, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Release8/IQ.csv", row.names = F)
+
+df = merge(df, IQ, by = c("URSI"))
+```
+
+Exploratory Factor Analysis
+```{r}
+
+domain_data= df[,c( "R_10", "R_1000", "R_1_Mil", "R_1000_Past", "R_1000_Exp_0", "R_Snack")]
+dom_polycor = hetcor(domain_data)
+dom_par_analysis <- fa.parallel(dom_polycor$correlations, n.obs = nrow(domain_data), n.iter = 1000, error.bars = TRUE)
+NumFactors = dom_par_analysis$nfact
+FA <- psych::fa(r = dom_polycor$correlations, n.obs = nrow(domain_data), nfactors = NumFactors, rotate = 'Promax', fm = "wls", scores = "Bartlett")
+
+```
+
+Confirmatory Factor Analysis
+```{r, echo = F}
+
+cfa_model <- 'Factor1 =~ R_1_Mil
+Factor2 =~ R_Snack
+Factor3 =~ R_1000 + R_1000_Past + R_10 + R_1000_Exp_0'
+
+cfa_fit <- cfa(model = cfa_model, data = df[,c( "R_10", "R_1000", "R_1_Mil", "R_1000_Past", "R_1000_Exp_0", "R_Snack")])
+
+summary(cfa_fit, fit.measures = TRUE)
+cfa_scores = data.frame(predict(cfa_fit))
+#omega(domain_data, rotate = "promax", fm = "wls")
+df = cbind(df, cfa_scores)
+
+semPaths(cfa_fit, what="std",edge.label.cex=.76,edge.color="black", sizeLat=10,sizeMan=7,asize=3)
+
+
+parameterEstimates(cfa_fit, standardized=TRUE) %>% 
+  filter(op == "=~") %>% 
+  mutate(stars = ifelse(pvalue < .001, "***", 
+                        ifelse(pvalue < .01, "**", 
+                               ifelse(pvalue < .05, "*", "")))) %>%
+  select('Latent Factor'=lhs, 
+         Indicator=rhs, 
+         B=est, 
+         SE=se, Z=z, 
+         Beta=std.all, 
+         sig=stars) %>% 
+  kable(digits = 3, format="pandoc", caption=" Factor Loadings")
+
+write.csv(df, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df.csv")
+
+```
+
+CBCL Subs Total 
+```{r, echo = F}
+
+CBCL_Subs = CBCL_r8 %>%
+  select(URSI,  "CBCL_AD_T", "CBCL_WD_T", "CBCL_SC_T", "CBCL_SP_T", 
+"CBCL_TP_T", "CBCL_AP_T", "CBCL_RBB_T", "CBCL_AB_T") 
+
+CBCL_Subs = merge(CBCL_Subs, df, by = c("URSI")) %>% 
+  select(URSI, starts_with("CBCL")) %>% na.omit()
+
+write.csv(CBCL_Subs, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/CBCL_subs.csv")
+
+```
+
+Cognitive Data
+```{r}
+
+wiat = read.csv("/Users/jacob.derosa/Downloads/WIAT_r8.csv", header = T, sep = ",") %>% 
+  select(URSI, ends_with("_stnd")) %>% na.omit() 
+
+wisc = read.csv("/Users/jacob.derosa/Downloads/WISC_r8.csv", header = T, sep = ",") %>% 
+  select(URSI, WISC_VSI, WISC_VCI, WISC_FRI, WISC_WMI, WISC_PSI) %>% na.omit() 
+
+#df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df.csv") %>% select(URSI)
+cog_subs = merge(wiat, wisc, by = c("URSI")) 
+cog_subs = merge(cog_subs, df, by = c("URSI")) %>% mutate_at(c(2:14), funs(c(scale(.)))) %>% select(URSI, starts_with("WIAT"), starts_with("WISC"))
+write.csv(cog_subs, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/COG_subs.csv")
+
+```
+
+Mergeing IQ, Income, and with Temp Disc Dataframe
+```{r}
+
+df = merge(df, FSQ, by = c("URSI"))
+write.csv(df, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df_income.csv")
+
+```
+
+CBCL Subs Raw Age
+```{r}
+
+#CBCL_Subs_Raw = CBCL_r8 %>% 
+#  select(URSI,  "CBCL_AD", "CBCL_WD", "CBCL_SC", "CBCL_SP", 
+#         "CBCL_TP", "CBCL_AP", "CBCL_RBB", "CBCL_AB") %>% na.omit()
+
+#CBCL_Subs_Raw = merge(CBCL_Subs_Raw, df[, c("URSI", "Age", "Sex")], by=c("URSI"))
+
+#formula <- as.formula(paste0("cbind(", paste(names(CBCL_Subs_Raw)[2:9], collapse = ","), ") ~ Age + Sex"))
+
+#fit <- lm(formula, data=CBCL_Subs_Raw)
+#domain_data = resid(fit) 
+#colnames(domain_data) = paste0('R_', colnames(domain_data))
+#CBCL_Subs_Raw_Resid = cbind(CBCL_Subs_Raw[1], domain_data) #%>% mutate_at(c(2:9), funs(c(scale(.))))
+
+#write.csv(CBCL_Subs_Raw_Resid, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/CBCL_Raw_Subs_Resid.csv")
+
+```
+
+CBCL Individual Itmes
+```{r}
+
+#df_ursi = df %>% select(URSI, Age)
+#CBCL_Ind = CBCL_r8[1:120]
+#CBCL_Ind = merge(CBCL_Ind, df_ursi, by = c("URSI")) 
+
+## Parallel Computing
+#library(doParallel)
+#cores <- 6
+#cl <- makeCluster(cores)
+#registerDoParallel(cores)
+#getDoParWorkers() # Just checking, how many workers you have
+
+#Imputation 
+#library(missForest)
+#cbcl.imp <- missForest(CBCL_Ind[2:120], ntree = 300, parallelize = "forests")
+#cbcl_ind_imp = cbind(CBCL_Ind[1], cbcl.imp$ximp)
+#cbcl_ind_imp = cbcl_ind_imp %>% mutate_at(c(2:120), (funs(round(.,0))))
+#write.csv(cbcl_ind_imp, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/CBCL_Imputed.csv", row.names = F)
+
+```
+
+# Age Residuals on Imputed CBCL Items 
+```{r}
+
+#CBCL_Ind = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/CBCL_Imputed.csv")
+#df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df.csv") %>% select(URSI, Age)
+#CBCL_Ind = merge(df, CBCL_Ind) %>% mutate_at(c(3:121), funs(c(scale(.))))
+
+#formula <- as.formula(paste0("cbind(", paste(names(CBCL_Ind)[3:121], collapse = ","), ") ~ Age"))
+#fit <- lm(formula, data=CBCL_Ind)
+#domain_data = resid(fit) 
+#colnames(domain_data) = paste0('R_', colnames(domain_data))
+
+#CBCL_Ind = cbind(CBCL_Ind[1], domain_data)
+
+#write.csv(CBCL_Ind, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/CBCL_Ind.csv")
+
+```
+

@@ -1,0 +1,282 @@
+---
+title: "Delay Discounting GAM Models"
+author: "Jacob DeRosa"
+date: "9/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = F,warning = F}
+
+source('C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Jake_Functions.R')
+
+```
+*-------------------------------------------*
+*                GAM Formula                *
+*-------------------------------------------*
+```{r}
+
+formula_fas1 = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T) + s(Age, Sex, by = Group, k = 3, bs = "fs") + Sex + s(Study_Site, bs = "re"))
+formula_fas2 = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T) + s(Age, Sex, by = Group,  k = 3, bs = "fs") + Sex + s(Study_Site, bs = "re"))
+formula_fas3 = as.formula(Factor3 ~ Group + s(Age, k=3, fx=T) + s(Age, Sex, by = Group, k = 3, bs= "fs") + Sex + s(Study_Site, bs = "re"))
+#Age Interactions
+formula_fa1 = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T) + s(Age, by = Group, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+formula_fa2 = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T) + s(Age, by = Group, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+formula_fa3 = as.formula(Factor3 ~ Group + s(Age, k=3, fx=T) + s(Age, by = Group, k=3, fx=T ) + Sex + s(Study_Site, bs = "re"))
+#Main Effects
+formula_f1 = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+formula_f2 = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+formula_f3 = as.formula(Factor3 ~ Group + s(Age, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+
+
+```
+
+*-------------------------------------------*
+*               DX GAM Models               *
+*-------------------------------------------*
+```{r}
+
+df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df.csv", header = T, sep = ",") #%>% mutate(Income = factor(Income))
+dx.names = c("ANX", "ADHD_C_NA", "ADHD_I_NA", "DEP", "LD", "ASD_NA", "ASD_ADHD", "ODD")
+dx.models = sapply(dx.names, function(x) NULL)
+factor1 = "Factor1"; factor2 = "Factor2"; factor3 = "Factor3";
+full_sex_model = "fullsex_model"; full_model = "full_model"; main_model = "main_model_outout"
+
+for(x in dx.names){
+  subitdx(df, x)
+  for(s in full_sex_model){
+    for(f in factor1){
+      dx.models[[x]][[s]][[f]] = jam(dx_nt, formula_fas1)
+    }
+    for(g in factor2){
+      dx.models[[x]][[s]][[g]] = jam(dx_nt, formula_fas2)
+    }
+    for(h in factor3){
+      dx.models[[x]][[s]][[h]] = jam(dx_nt, formula_fas3)
+    }
+  }
+   for(u in full_model){
+    for(f in factor1){
+      dx.models[[x]][[u]][[f]] = jam(dx_nt, formula_fa1)
+    }
+    for(g in factor2){
+      dx.models[[x]][[u]][[g]] = jam(dx_nt, formula_fa2)
+    }
+    for(h in factor3){
+      dx.models[[x]][[u]][[h]] = jam(dx_nt, formula_fa3)
+    }
+   }
+   for(m in main_model){
+    for(f in factor1){
+      dx.models[[x]][[m]][[f]] = jam(dx_nt, formula_f1, main=T)
+    }
+    for(g in factor2){
+      dx.models[[x]][[m]][[g]] = jam(dx_nt, formula_f2, main=T)
+    }
+    for(h in factor3){
+      dx.models[[x]][[m]][[h]] = jam(dx_nt, formula_f3, main=T)
+    }
+   }
+}
+
+sig = extract(dx.models)
+pander(sig)
+sig1 = sig[1]
+sig2 = sig[3]
+sig = list(sig1, sig2)
+write.list(z = sig, file = "C:/Users/jacob.derosa/Documents/dx_tables.csv")
+```
+*-------------------------------------------*
+*             CBCL GAM Models               *
+*-------------------------------------------*
+```{r}
+
+
+formula_fas1 = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T) + s(Age, Sex, by = Group, k = 3, bs = "fs") + Sex + s(Study_Site, bs = "re"))
+formula_fas2 = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T) + s(Age, Sex, by = Group,  k = 3, bs = "fs") + Sex + s(Study_Site, bs = "re"))
+formula_fas3 = as.formula(Factor3 ~ Group + s(Age, k=3, fx=T) + s(Age, Sex, by = Group, k = 3, bs= "fs") + Sex + s(Study_Site, bs = "re"))
+
+#Age Interactions
+formula_fa1 = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T) + s(Age, by = Group, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+formula_fa2 = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T) + s(Age, by = Group, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+formula_fa3 = as.formula(Factor3 ~ Group + s(Age, k=3, fx=T) + s(Age, by = Group, k=3, fx=T ) + Sex + s(Study_Site, bs = "re"))
+#Main Effects
+formula_f1 = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+formula_f2 = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+formula_f3 = as.formula(Factor3 ~ Group + s(Age, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+
+
+data_cbcl = read.csv('C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Subtype_Data/CBCL_Subtypes.csv', header = T, sep = ",") %>% 
+  select(URSI, Subtype, starts_with("WISC"), starts_with("WIAT")) %>% mutate(Subtype = as.factor(Subtype))
+df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df.csv", header = T, sep = ",") 
+data_cbcl = merge(data_cbcl, df, by = c("URSI"))
+
+cbcl.names = c("1", "2", "3")
+cbcl.models = sapply(cbcl.names, function(x) NULL)
+factor1 = "Factor1"; factor2 = "Factor2"; factor3 = "Factor3";
+full_sex_model = "fullsex_model"; full_model = "full_model"; main_model = "main_model_outout"
+
+for(x in cbcl.names){
+  subit(data_cbcl, S1 = "4", S2 = x)
+  for(s in full_sex_model){
+    for(f in factor1){
+      cbcl.models[[x]][[s]][[f]] = jam(subtype_df, formula_fas1)
+    }
+    for(g in factor2){
+      cbcl.models[[x]][[s]][[g]] = jam(subtype_df, formula_fas2)
+    }
+    for(h in factor3){
+      cbcl.models[[x]][[s]][[h]] = jam(subtype_df, formula_fas3)
+    }
+  }
+   for(u in full_model){
+    for(f in factor1){
+      cbcl.models[[x]][[u]][[f]] = jam(subtype_df, formula_fa1)
+    }
+    for(g in factor2){
+      cbcl.models[[x]][[u]][[g]] = jam(subtype_df, formula_fa2)
+    }
+    for(h in factor3){
+      cbcl.models[[x]][[u]][[h]] = jam(subtype_df, formula_fa3)
+    }
+   }
+   for(m in main_model){
+    for(f in factor1){
+      cbcl.models[[x]][[m]][[f]] = jam(subtype_df, formula_f1, main=T)
+    }
+    for(g in factor2){
+      cbcl.models[[x]][[m]][[g]] = jam(subtype_df, formula_f2, main=T)
+    }
+    for(h in factor3){
+      cbcl.models[[x]][[m]][[h]] = jam(subtype_df, formula_f3, main=T)
+    }
+   }
+}
+
+cbcl_sig = extract(cbcl.models)
+pander(cbcl_sig)
+write.list(z = cbcl_sig[1], file = "C:/Users/jacob.derosa/Documents/cbcl_tables.csv")
+```
+*-------------------------------------------*
+*             COG GAM Models                *
+*-------------------------------------------*
+```{r}
+
+formula_fas1 = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T ) + s(Age, Sex, by = Group, k = 3, bs = "fs") + Sex + s(Study_Site, bs = "re"))
+formula_fas2 = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T ) + s(Age, Sex, by = Group,  k = 3, bs = "fs") + Sex + s(Study_Site, bs = "re"))
+formula_fas3 = as.formula(Factor3 ~ Group + s(Age, k=3, fx=T ) + s(Age, Sex, by = Group, k = 3, bs= "fs") + Sex  + s(Study_Site, bs = "re"))
+#Age Interactions
+formula_fa1 = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T ) + s(Age, by = Group, k=3, fx=T ) + Sex + s(Study_Site, bs = "re"))
+formula_fa2 = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T ) + s(Age, by = Group, k=3, fx=T ) + Sex + s(Study_Site, bs = "re"))
+formula_fa3 = as.formula(Factor3 ~ Group + s(Age, k=3, fx=T ) + s(Age, by = Group, k=3, fx=T ) + Sex + s(Study_Site, bs = "re"))
+#Main Effects
+formula_f1 = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T ) + Sex + s(Study_Site, bs = "re"))
+formula_f2 = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T ) + Sex + s(Study_Site, bs = "re"))
+formula_f3 = as.formula(Factor3 ~ Group + s(Age, k=3, fx=T ) + Sex + s(Study_Site, bs = "re"))
+
+
+data_cog = read.csv('C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Subtype_Data/COG_Subtypes.csv', header = T, sep = ",") %>% 
+  select(URSI, Subtype, starts_with("WISC"), starts_with("WIAT")) %>% mutate(Subtype = as.factor(Subtype))
+df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df.csv", header = T, sep = ",") 
+data_cog = merge(data_cog, df, by = c("URSI"))
+
+cog.names = c("2", "3")
+cog.models = sapply(cog.names, function(x) NULL)
+factor1 = "Factor1"; factor2 = "Factor2"; factor3 = "Factor3";
+full_sex_model = "fullsex_model"; full_model = "full_model"; main_model = "main_model_outout"
+
+for(x in cog.names){
+  subit(data_cog, S1 = "1", S2 = x)
+  for(s in full_sex_model){
+    for(f in factor1){
+      cog.models[[x]][[s]][[f]] = jam(subtype_df, formula_fas1)
+    }
+    for(g in factor2){
+      cog.models[[x]][[s]][[g]] = jam(subtype_df, formula_fas2)
+    }
+    for(h in factor3){
+      cog.models[[x]][[s]][[h]] = jam(subtype_df, formula_fas3)
+    }
+  }
+   for(u in full_model){
+    for(f in factor1){
+      cog.models[[x]][[u]][[f]] = jam(subtype_df, formula_fa1)
+    }
+    for(g in factor2){
+      cog.models[[x]][[u]][[g]] = jam(subtype_df, formula_fa2)
+    }
+    for(h in factor3){
+      cog.models[[x]][[u]][[h]] = jam(subtype_df, formula_fa3)
+    }
+   }
+   for(m in main_model){
+    for(f in factor1){
+      cog.models[[x]][[m]][[f]] = jam(subtype_df, formula_f1, main=T)
+    }
+    for(g in factor2){
+      cog.models[[x]][[m]][[g]] = jam(subtype_df, formula_f2, main=T)
+    }
+    for(h in factor3){
+      cog.models[[x]][[m]][[h]] = jam(subtype_df, formula_f3, main=T)
+    }
+   }
+}
+
+cog_sig = extract(cog.models)
+pander(cog_sig)
+write.list(z = cog_sig[1], file = "C:/Users/jacob.derosa/Documents/cog_tables.csv")
+```
+*-------------------------------------------*
+*       Bootstrapped DX GAM Models          *
+*-------------------------------------------*
+```{r}
+
+df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df.csv", header = T, sep = ",")
+dx.names = c("ANX", "ADHD_C_NA", "ADHD_I_NA", "DEP", "LD", "ASD_NA", "ASD_ADHD", "ODD")
+boot.dx.models = sapply(dx.names, function(x) NULL)
+factor1 = "Factor1"; factor2 = "Factor2"; factor3 = "Factor3";
+full_sex_model = "full_sex_model"; full_model = "full_model"; main_model = "main_model_outout"
+
+for(x in dx.names){
+    subitdx(df, x)
+  for(s in full_sex_model){
+    for(f in factor1){
+      boot.dx.models[[x]][[s]][[f]] = smooth_boot(dx_nt, formula_fas1)
+    }
+    for(g in factor2){
+      boot.dx.models[[x]][[s]][[g]] = smooth_boot(dx_nt, formula_fas2)
+    }
+    for(h in factor3){
+      boot.dx.models[[x]][[s]][[h]] = smooth_boot(dx_nt, formula_fas3)
+    }
+  }
+   for(u in full_model){
+    for(f in factor1){
+      boot.dx.models[[x]][[u]][[f]] = smooth_boot(dx_nt, formula_fa1)
+    }
+    for(g in factor2){
+      boot.dx.models[[x]][[u]][[g]] = smooth_boot(dx_nt, formula_fa2)
+    }
+    for(h in factor3){
+      boot.dx.models[[x]][[u]][[h]] = smooth_boot(dx_nt, formula_fa3)
+    }
+   }
+   for(m in main_model){
+    for(f in factor1){
+      boot.dx.models[[x]][[m]][[f]] = main_boot(dx_nt, formula_f1)
+    }
+    for(g in factor2){
+      boot.dx.models[[x]][[m]][[g]] = main_boot(dx_nt, formula_f2)
+    }
+    for(h in factor3){
+      boot.dx.models[[x]][[m]][[h]] = main_boot(dx_nt, formula_f3)
+    }
+   }
+}
+
+boot_sig_pvals = data.frame("pval" = unlist(boot.dx.models)) %>% t() %>% data.frame() %>% select(-ends_with("F"), -ends_with("t.value")) %>% filter(pval < 0.05) %>%  mutate_at(c(1:length(X)), funs(c(round(.,4)))) %>% t()
+
+```

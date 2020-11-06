@@ -1,0 +1,125 @@
+---
+title: "Diagnosis Cleaning"
+author: "Jacob DeRosa"
+date: "5/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = F}
+
+source('C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Jake_Functions.R')
+
+```
+
+```{r, echo = F}
+#import data 
+ConsensusDx_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Release8/ConsensusDx_r8.csv", header =T, sep = ",")
+
+```
+
+```{r, echo = F}
+
+rd_no <- ConsensusDx_r8 %>%
+  select(URSI, DX_01_Cat, DX_01_Sub, DX_01, DX_02_Cat, DX_02_Sub, DX_02, DX_03_Cat, DX_03_Sub, DX_03, DX_04_Cat, DX_04_Sub, DX_04,
+         DX_05_Cat, DX_05_Sub, DX_05, DX_06_Cat, DX_06_Sub, DX_06, DX_07_Cat, DX_07_Sub, DX_07, DX_08_Cat, DX_08_Sub, DX_08,
+         DX_09_Cat, DX_09_Sub, DX_09, DX_10_Cat, DX_10_Sub, DX_10) %>%
+  gather(DX_Type_Num, DX, -URSI) %>%
+  filter(DX != "NULL")
+
+rd_no$DX_Type_Num <- gsub("DX_", "", rd_no$DX_Type_Num)
+
+final_rd_no <- rd_no %>%
+  mutate(DX_Type_Num = ifelse(grepl("^[0-9][0-9]$", rd_no$DX_Type_Num), paste(rd_no$DX_Type_Num, "dx", sep = "_"), DX_Type_Num))%>%
+  separate(DX_Type_Num, into =c("Num", "Type")) %>%
+  spread(Type, DX) %>%
+  mutate(DX = ifelse(Cat == "Neurodevelopmental Disorders", Sub, Cat)) %>%
+  filter(DX != " ") %>% 
+  filter(DX != "No Diagnosis Given: Incomplete Eval") %>%
+  mutate(DX = ifelse(DX == "Apppendix (Neurobehavioral Disorder)", "Neurobehavioral Disorder", ifelse(DX == "Other Neurodevelopmental Disorders", "Neurodevelopmental Disorders", DX)))%>%
+  mutate(DX = ifelse(DX == "Specific Learning Disorder", dx, DX)) %>%
+  mutate(DX = as.factor(DX))
+
+dx_bi <- final_rd_no[, c(1,6)]
+
+dx_bi2 <- dx_bi %>% 
+  mutate(DX = as.character(DX)) %>%
+  filter(DX != "") %>%
+  group_by(URSI) %>%
+  summarize(DX = list(DX))
+
+diagnosis <- unique(unlist(dx_bi2$DX))
+
+dummyvars <- function(data, list, column) {
+  
+  column = enquo(column)
+  test <- data %>% dplyr::mutate(!!list := sapply(!!column, function (x) ifelse(!!list %in% x, 1, 0)))
+  print(paste0("column ", tail(names(test), n=1), " created!"))
+  return(test)
+
+}
+
+for (i in diagnosis) {
+   dx_bi2 <- dummyvars(dx_bi2, i, DX)
+}
+
+dx_bi2 <- dx_bi2[, c(-27, -31)]
+
+dx_bi3 <- dx_bi2 %>% 
+  mutate(Other2 = rowSums(.[,c(3:14, 16:29)], na.rm = T)) %>%
+  mutate(Other3 = rowSums(.[,c(8:12,14,17:28)], na.rm = T),
+         Other = ifelse(Other3 > 0, 1, 0)) 
+
+```
+
+```{r}
+
+specific_dx = final_rd_no %>% select(URSI, dx) %>%
+  filter(dx == "ADHD-Hyperactive/Impulsive Type" | dx == "ADHD-Inattentive Type" | dx == "ADHD-Combined Type" | dx == "Oppositional Defiant Disorder")
+
+sp_dx_bi <- specific_dx %>% 
+  mutate(dx = as.character(dx)) %>%
+  filter(dx != "") %>%
+  group_by(URSI) %>%
+  summarize(dx = list(dx))
+
+sp_diagnosis <- unique(unlist(sp_dx_bi$dx))
+
+for (i in sp_diagnosis) {
+  
+  sp_dx_bi <- dummyvars(sp_dx_bi, i, dx)
+  
+}
+
+```
+
+```{r, echo = F}
+
+full_dx = sp_dx_bi %>%
+  full_join(dx_bi3) %>%
+  select(-DX, - dx)
+
+full_dx_2 = full_dx[,c(1:10,16,18:19,35)] %>% 
+  mutate(Learning_Disorder = ifelse(`Specific Learning Disorder with Impairment in Mathematics` == 1 | 
+                                      `Specific Learning Disorder with Impairment in Reading` == 1 | 
+                                      `Specific Learning Disorder with Impairment in Written Expression` == 1, "1", "0")) %>%
+  replace(is.na(.), 0)
+
+full_dx_all = full_dx %>%
+  mutate(Other_Dx = ifelse(`Neurobehavioral Disorder` == 1 |`Neurocognitive Disorders` == 1 | `Gender Dysphoria` == 1 | `Personality Disorders` == 1 | `Other Conditions That May Be a Focus of Clinical Attention` == 1 | `Neurodevelopmental Disorders` == 1 | `Somatic Symptom and Related Disorders` == 1, "1", "0")) %>% select(-Other, -Other2, -Other3, -`Attention-Deficit/Hyperactivity Disorder`, -`Neurobehavioral Disorder`, -`Somatic Symptom and Related Disorders`, -`Neurocognitive Disorders`, -`Gender Dysphoria`, -`Personality Disorders`, -`Other Conditions That May Be a Focus of Clinical Attention`, -`Neurodevelopmental Disorders`) %>%
+  replace(is.na(.), 0) 
+
+```
+
+```{r, echo = F}
+
+
+write.csv(full_dx_2, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Diagnosis.csv")
+write.csv(full_dx_all, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Diagnosis_all.csv")
+
+
+```
+
