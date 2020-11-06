@@ -1,0 +1,70 @@
+---
+title: "Sex Distribution Plot"
+author: "Jacob DeRosa"
+date: "9/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, fig.height= 7, fig.width= 15.5}
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpol)
+
+df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df.csv", header = T, sep = ",") %>% 
+  mutate(Sex = ifelse(Sex == 1, "Female", "Male")) %>%
+  mutate(Sex = as.factor(Sex)) %>% mutate(Age = factor(floor(Age)))
+
+age_sex_diagnosis_long = df %>% group_by(Sex, Age) %>% summarise(Count = n()) %>%
+  mutate(Perc = paste("(", round(Count / sum(Count)*100,2), "%)", sep = "")) %>% 
+  unite("Comb", Count:Perc, remove = FALSE) %>% mutate(Comb = gsub("_", " ", Comb))
+
+age_sex_diagnosis_long$Count <- ifelse(age_sex_diagnosis_long$Sex == "Female", -1*age_sex_diagnosis_long$Count, age_sex_diagnosis_long$Count)
+age_sex_diagnosis_long$Count2 <- ifelse(age_sex_diagnosis_long$Sex == "Female", -1*age_sex_diagnosis_long$Count, age_sex_diagnosis_long$Count)
+
+brks <- seq(-100, 100, 10)
+lbls = c(seq(100, 0, -10), seq(10, 100, 10))
+
+dummy = data.frame(Age = NA, Sex=rep(c("Male", "Female"), each=2), Count = c(0, 100, 0, -100))
+
+ggplot(age_sex_diagnosis_long, aes(x = Age, y = Count, fill = Sex)) + 
+    geom_bar(data =subset(age_sex_diagnosis_long, Sex == "Male"), stat = "identity") + 
+    geom_text(data = subset(age_sex_diagnosis_long, Sex == "Male"), aes(label=Comb), size = 5, hjust = -0.05, fontface = "bold") +
+    geom_bar(data = subset(age_sex_diagnosis_long, Sex == "Female"), stat = "identity") + 
+  geom_text(data = subset(age_sex_diagnosis_long, Sex == "Female"), aes(label=Comb), size = 5, hjust = 1.05, fontface = "bold") +
+  coord_flip() + 
+  scale_y_continuous(expand = c(0,4), breaks = brks, labels = lbls) +
+  scale_x_discrete(expand = c(0,.1),breaks=seq(5,21,1)) +
+  geom_blank(data=dummy, aes(Age, Count)) +
+  facet_share(~Sex, dir = "h", scales = "free") +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_blank(), 
+        strip.background.x=element_rect(color = NA,  fill=NA), strip.background.y=element_rect(color = "black",  fill=NA),
+        axis.text=element_text(size=20, face = "bold", color = "black"),
+        axis.title=element_text(size=20,face="bold", color = "black"),
+        panel.background = element_rect(fill = "white"),
+        legend.background = element_blank(),
+        legend.position = "top", 
+        #legend.position = c(0.94, .25),
+        #legend.justification = c("right", "top"),
+        #legend.box.just = "right",
+        legend.text = element_text(size = 18, face = "bold"),
+      #  legend.margin = margin(6, 6, 6, 10),
+        legend.title = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  scale_fill_manual(values = c("#ff00d9","#0091FF")) + 
+  scale_color_manual(values = c("#ff00d9","#0091FF"))  +   
+   scale_x_discrete(limits=c("17","16","15", "14", "13", "12", "11", "10", "9", "8","7","6","5")) +
+  ylab("Age") +
+  xlab("") 
+
+```
+

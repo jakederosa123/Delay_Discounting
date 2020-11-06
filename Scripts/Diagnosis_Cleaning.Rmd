@@ -10,14 +10,14 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, echo = F}
-#load libraries 
-library(dplyr)
+
+source('C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Jake_Functions.R')
 
 ```
 
 ```{r, echo = F}
 #import data 
-ConsensusDx_r8 <- read.csv("J:/Healthy Brain Network/10. Staff Development/Research Projects/2019/Jake/Release8/ConsensusDx_r8.csv", header =T, sep = ",")
+ConsensusDx_r8 <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Release8/ConsensusDx_r8.csv", header =T, sep = ",")
 
 ```
 
@@ -62,11 +62,8 @@ dummyvars <- function(data, list, column) {
 
 }
 
-
 for (i in diagnosis) {
-  
-  dx_bi2 <- dummyvars(dx_bi2, i, DX)
-  
+   dx_bi2 <- dummyvars(dx_bi2, i, DX)
 }
 
 dx_bi2 <- dx_bi2[, c(-27, -31)]
@@ -75,7 +72,6 @@ dx_bi3 <- dx_bi2 %>%
   mutate(Other2 = rowSums(.[,c(3:14, 16:29)], na.rm = T)) %>%
   mutate(Other3 = rowSums(.[,c(8:12,14,17:28)], na.rm = T),
          Other = ifelse(Other3 > 0, 1, 0)) 
-
 
 ```
 
@@ -98,7 +94,6 @@ for (i in sp_diagnosis) {
   
 }
 
-
 ```
 
 ```{r, echo = F}
@@ -116,15 +111,14 @@ full_dx_2 = full_dx[,c(1:10,16,18:19,35)] %>%
 full_dx_all = full_dx %>%
   mutate(Other_Dx = ifelse(`Neurobehavioral Disorder` == 1 |`Neurocognitive Disorders` == 1 | `Gender Dysphoria` == 1 | `Personality Disorders` == 1 | `Other Conditions That May Be a Focus of Clinical Attention` == 1 | `Neurodevelopmental Disorders` == 1 | `Somatic Symptom and Related Disorders` == 1, "1", "0")) %>% select(-Other, -Other2, -Other3, -`Attention-Deficit/Hyperactivity Disorder`, -`Neurobehavioral Disorder`, -`Somatic Symptom and Related Disorders`, -`Neurocognitive Disorders`, -`Gender Dysphoria`, -`Personality Disorders`, -`Other Conditions That May Be a Focus of Clinical Attention`, -`Neurodevelopmental Disorders`) %>%
   replace(is.na(.), 0) 
+
 ```
 
 ```{r, echo = F}
 
 
-write.csv(full_dx_2, "J:/Healthy Brain Network/10. Staff Development/Research Projects/2019/Jake/Release8/Diagnosis.csv")
-write.csv(full_dx_2, "C:/Users/jacob.derosa/Desktop/Scripts/Diagnosis.csv")
-
-write.csv(full_dx_all, "C:/Users/jacob.derosa/Desktop/Scripts/Diagnosis_all.csv")
+write.csv(full_dx_2, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Diagnosis.csv")
+write.csv(full_dx_all, "C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/Diagnosis_all.csv")
 
 
 ```

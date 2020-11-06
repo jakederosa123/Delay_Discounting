@@ -1,0 +1,243 @@
+---
+---
+title: "Delay Discounting Figure Plots"
+author: "Jacob DeRosa"
+date: "10/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = F, warning = F}
+
+source('C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Jake_Functions.R')
+
+```
+
+Data
+```{r}
+
+df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df.csv", header = T, sep = ",") %>% 
+  rename(Anxiety = ANX, `ADHD Combined` = ADHD_C_NA, `ADHD Inattentive` = ADHD_I_NA, Depression = DEP, `Learning Disorders` = LD, `Autism` = ASD_NA) 
+
+df_income = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Data/temp_disc_df._income.csv", header = T, sep = ",") 
+
+data_cbcl = read.csv('C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Subtype_Data/CBCL_Subtypes.csv', header = T, sep = ",") %>% 
+  select(URSI, Subtype, starts_with("WISC"), starts_with("WIAT")) %>% mutate(Subtype = as.factor(Subtype))
+data_cbcl = merge(data_cbcl, df, by = c("URSI"))
+
+data_cog= read.csv('C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Subtype_Data/Cog_Subtypes.csv', header = T, sep = ",") %>% 
+  select(URSI, Subtype, starts_with("WISC"), starts_with("WIAT")) %>% mutate(Subtype = as.factor(Subtype))
+data_cog = merge(data_cog, df, by = c("URSI"))
+
+```
+
+Color Codes
+```{r}
+
+colors = data.frame(HighIncome="#952EA0", MediumIncome="orange", LowIncome="#ED5983", Males="#0091FF", Females="#ff00d9", 
+                    Neurotypical="#11746c", Anxiety="#92e109", ADHD_C_NA="#ff6e00", ASD_NA ="#ece552", ADHD_I_NA="#5c0000", Depression="#a150d3",
+                    Learning="#f1b322", CBCL_S1="#6faac9", CBCL_S2="#7a5195", CBCL_S3="#ef5675", CBCL_S4="#ffa600", COG_S1="#428832", 
+                    COG_S2="#cf333f", COG_S3="#693d71")
+
+```
+
+Income High vs. Low
+```{r}
+
+gammer(data = subitincome(df_income, High= T, Low=T), 
+  formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T) + s(Age, by = Group, k=3, fx=T) + Sex + s(Study_Site, bs = "re")),
+  xvar = "Age", 
+  title = "High vs. Low Income", 
+  xlabtitle = "Chronological Age", 
+  color1 = colors$HighIncome,
+  color2 = colors$LowIncome,
+  Sex = T,
+  main = T, 
+  main_formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx=T) + Sex + s(Study_Site, bs = "re"))
+  )
+
+
+```
+
+Sex 
+```{r}
+
+gammer(data = df %>% mutate(IQ = as.numeric(IQ)) %>%  
+        mutate(Sex = factor(ifelse(Sex == 1, "Female", "Male"))) %>% 
+        mutate(Sex = ordered(Sex, levels = c("Male", "Female"))) %>% 
+        mutate(Study_Site = factor(Study_Site))  %>% mutate(Group = Sex), 
+       formula = as.formula(Factor3 ~ Group + s(Age, k=3, fx=T) + s(Age, by = Group, k=3, fx=T) + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "Males vs. Females", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$Males,
+       color2 = colors$Females
+       )
+
+```
+
+ADHD Combined 
+```{r}
+
+gammer(data = subitdx(df, "ADHD Combined"), 
+       formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + s(Age, by = Group, k=3, fx = T) + Sex + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "ADHD Combined vs. Neurotypical", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$Neurotypical,
+       color2 = colors$ADHD_C_NA, 
+       Sex = T,
+       main = T,
+       main_formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + Sex + s(Study_Site, bs = "re"))
+       )
+
+gammer(data = subitdx(df, "ADHD Combined"), 
+       formula = as.formula(Factor3 ~ Group + s(Age, k=3, fx = T) + s(Age, by = Group, k=3, fx = T) + Sex + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "ADHD Combined vs. Neurotypical", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$Neurotypical,
+       color2 = colors$ADHD_C_NA, 
+       Sex = T,
+       main = T,
+       main_formula = as.formula(Factor3 ~ Group + s(Age, k=3, fx = T) + Sex + s(Study_Site, bs = "re"))
+       )
+
+
+gammer(data = subitdx(df, "ADHD Combined", Female = T), 
+       formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + s(Age, by = Group, k=3, fx = T) + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "Females: ADHD Combined vs. Neurotypical", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$Neurotypical,
+       color2 = colors$ADHD_C_NA,
+       main_formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + s(Study_Site, bs = "re")), 
+       main = T
+       )
+
+```
+
+Anxiety
+```{r}
+
+gammer(data = subitdx(df, "Anxiety", Female = T), 
+       formula = as.formula(Factor3 ~ Group + s(Age, k=3, fx = T) + s(Age, by = Group, k=3, fx=T) + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "Females: Anxiety vs. Neurotypical", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$Neurotypical,
+       color2 = colors$Anxiety, 
+       )
+
+```
+
+Autism
+```{r}
+
+gammer(data = subitdx(df, "Autism"), 
+       formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + s(Age, by = Group, k=3, fx = T) + Sex + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "Autism vs. Neurotypical", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$Neurotypical,
+       color2 = colors$Learning, 
+       Sex = T,
+       main = T,
+       main_formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + Sex + s(Study_Site, bs = "re"))
+       )
+```
+
+ADHD Inattentive
+```{r}
+
+gammer(data = subitdx(df, "ADHD Inattentive"), 
+       formula = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T) + s(Age, by = Group, k=3, fx=T) + Sex + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "Females: ADHD Inattentive vs. Neurotypical", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$Neurotypical,
+       color2 = colors$ADHD_I_NA,
+       main_formula = as.formula(Factor2 ~ Group + s(Age, k=3, fx=T) + Sex + s(Study_Site, bs = "re")),
+       main = T
+       )
+
+```
+
+Depression 
+```{r}
+
+gammer(data = subitdx(df, "Depression"), 
+       formula = as.formula(Factor2 ~ Group + s(Age, k=3, fx = T) + s(Age, by = Group, k=3, fx = T) + Sex + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "Depression vs. Neurotypicals", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$Neurotypical,
+       color2 = colors$Depression, 
+       Sex = T,
+       main = T, 
+       main_formula = as.formula(Factor2 ~ Group + s(Age, k=3, fx = T) + Sex + s(Study_Site, bs = "re"))
+       )
+
+```
+
+CBCL Subtypes
+```{r}
+
+gammer(data = subit(data_cbcl, S1 = 4, S2 = 2), 
+       formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + s(Age, by = Group, k=3, fx = T) + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "CBCL: Subtype 1 vs. Subtype 2", 
+       xlabtitle = "Chronological Age",  
+       color1 = colors$CBCL_S4,
+       color2 = colors$CBCL_S2, 
+       main =T, 
+       main_formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + s(Study_Site, bs = "re"))
+       )
+
+
+```
+
+COG Subtypes
+```{r}
+
+gammer(data = subit(data_cog, S1 = 1, S2 = 2), 
+       formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + s(Age, by = Group, k=3, fx = T) + Sex + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "WISC/WIAT: Subtype 1 vs. Subtype 2", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$COG_S2,
+       color2 = colors$COG_S1, 
+       Sex = T,
+       main = T, 
+       main_formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + Sex + s(Study_Site, bs = "re"))
+       )
+
+
+gammer(data = subit(data_cog, S1 = 1, S2 = 3), 
+       formula = as.formula(Factor3 ~ Group + s(Age, k=3, fx = T) + s(Age, by = Group, k=3, fx = T) + Sex + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "WISC/WIAT: Subtype 1 vs. Subtype 2", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$COG_S2,
+       color2 = colors$COG_S1, 
+       Sex = T,
+       main = T, 
+       main_formula = as.formula(Factor1 ~ Group + s(Age, k=3, fx = T) + Sex + s(Study_Site, bs = "re"))
+       )
+
+gammer(data = subit(data_cog, S1 = 1, S2 = 3), 
+       formula = as.formula(Factor3 ~ Group + s(Age, k=3, fx = T) + s(Age, by = Group, k=3, fx = T) + Sex + s(Study_Site, bs = "re")), 
+       xvar = "Age", 
+       title = "WISC/WIAT: Subtype 1 vs. Subtype 2", 
+       xlabtitle = "Chronological Age", 
+       color1 = colors$COG_S2,
+       color2 = colors$COG_S3, 
+       Sex = T,
+       main = T, 
+       main_formula = as.formula(Factor3 ~ Group + s(Age, k=3, fx = T) + Sex + s(Study_Site, bs = "re"))
+       )
+
+```

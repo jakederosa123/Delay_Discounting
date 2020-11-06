@@ -1,0 +1,85 @@
+---
+title: "Domain Variables Plot"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+---
+
+```{r, echo = F, include = F}
+library(tidyverse)
+library(ggthemes)
+library(readr)
+library(RColorBrewer)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = TRUE)
+```
+
+```{r, echo = F, include = F}
+
+library(dplyr)
+library(RColorBrewer)
+
+cog_colnames = data.frame("Var" = c('Spelling','Pseudoword Decoding','Word Reading', "Working Memory Index", "Numeracy", "Math Problem Solving", "Visual Spatial Index", "Fluid Reasoning", "Reading Comprehension", "Verbal Comprehension", "Oral Expression", "Listening Comprehension", "Processing Speed"), "Analysis" = c("Cognitive"))
+
+beh_colnames = data.frame("Var" = c('Attention Problems', 'Aggressive Beheavior', 'Rule Breaking Behavior','Thought Problems', 'Withdrawn Depressed', 'Somatic Complaints', 'Anxious Depressed', 'Social Problems'),"Analysis" = c("Behavioral"))
+
+temp_colnames = data.frame("Var" = c("$1,000,000"),"Analysis" = c("Factor 1 (Larger Later)"))
+temp_colnames2 = data.frame("Var" = c("Snack"),"Analysis" = c("Factor 2 (Snack)"))
+temp_colnames3 = data.frame("Var" = c("$10", "$1,000", "$1,000 in the Past", "$1,000 Explicit 0"),"Analysis" = c("Factor 3 (Smaller Sooner)"))
+
+dx_colnames =  data.frame("Var" = c("ADHD Combined", "ADHD Inatentive", "Autism with ADHD", "Autism without ADHD", "Anxiety", "Depression", "Learning Disorders", "Neurotypical"),"Analysis" = c("Diagnoses of Interest"))
+
+
+df1 = rbind(cog_colnames, beh_colnames, temp_colnames, temp_colnames2, temp_colnames3, dx_colnames)
+
+
+df1 = df1 %>%
+  mutate_if(sapply(df1, is.character), as.factor) %>%
+    mutate_if(sapply(df1, is.numeric), as.factor)
+
+```
+
+```{r, fig.height=22, fig.width=40, echo = F, warning = F, message = F}
+
+#col1 <- brewer.pal(7, "Set1") 
+col1 = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFF463", "#9EF7F2")
+var_plot = ggplot(df1, aes(y = 1, x = Analysis)) +
+  geom_col(aes(fill = Analysis, group = Var), color = "black", alpha = .5, size = 4) +
+  scale_fill_manual(values=col1) +
+  theme(legend.position = "none") +
+  geom_text(aes(label = Var), size = 10, vjust = 2.8, position = "stack", fontface = 'bold', color = "black") + 
+   theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) + 
+  theme(axis.text=element_text(size=5, face = "bold"),
+        axis.title=element_text(size=5,face="bold")) + 
+  theme(strip.text.x = element_text(face  = "bold", size = 10)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_discrete(expand = c(0,0), "") +
+  theme(legend.position = "none") + 
+  theme(axis.text.x = element_text(face="bold", size=)) +  
+  #ggtitle("Variables by Domain") + 
+     theme(plot.title = element_text(lineheight=.8, face="bold", size = 60, family = "Arial")) +
+  scale_x_discrete(limits=c("Factor 1 (Larger Later)","Factor 2 (Snack)","Factor 3 (Smaller Sooner)", "Diagnoses of Interest", "Cognitive", "Behavioral"), position = 'top') +
+   theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+    theme(axis.title.x=element_blank()) +
+  theme(axis.line=element_blank(), panel.background = element_blank()) + 
+  theme(axis.text.x = element_text(face="bold", family = "Arial", size=50, color = "black")) + 
+  scale_y_reverse()
+  
+#ggsave("C:/Users/jacob.derosa/Documents/Updated_Regsam_Splits/domain_vars.png", dpi = 300, width = 44, height = 24)
+
+var_plot
+
+```
+
+
+
+

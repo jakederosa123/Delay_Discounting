@@ -1,0 +1,67 @@
+---
+title: "Anova"
+author: "Jacob DeRosa"
+date: "9/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = F,warning = F}
+
+source('C:/Users/jacob.derosa/Desktop/Scripts/Temp_Disc_Splits/Jake_Functions.R')
+```
+
+*-------------------------------------------*
+*               ANOVA Models                *
+*-------------------------------------------*
+```{r}
+
+df = read.csv("/Users/jacob.derosa/Desktop/Scripts/temp_disc_df.csv", header = T, sep = ",")
+dx.names = c("ANX", "ADHD_C_NA", "ADHD_I_NA", "DEP", "LD", "ASD", "ODD")
+dx.models = sapply(dx.names, function(x) NULL)
+factor.names = c("Factor1", "Factor2", "Factor3")
+full.output.names = c("full_model_outout")
+reduced.output.names = c("reduced_model_outout")
+main.output.names = c("main_model_outout")
+
+for(x in dx.names){
+      for(t in full.output.names){
+        for(f in factor.names){
+            dx.models[[x]][[t]][[f]] = anova_full(df, x, f, t)
+        }
+      }
+      for(r in reduced.output.names){
+        for(f in factor.names){
+          dx.models[[x]][[r]][[f]] = anova_reduc(df, x,f, r)
+        }
+      }
+      for(m in main.output.names){
+        for(f in factor.names){
+          dx.models[[x]][[m]][[f]] = anova_reduc(df, x,f, m)
+        }
+      }
+}
+
+```
+
+```{r, message=F, warning=F}
+
+df = read.csv("/Users/jacob.derosa/Desktop/Scripts/temp_disc_df.csv", header = T, sep = ",")
+dx.names = c("ANX", "ADHD_C_NA", "ADHD_I_NA", "DEP", "LD", "ASD", "ODD")
+dx.models = sapply(dx.names, function(x) NULL)
+reduced.output.names = c("reduced_model_outout")
+
+for(x in dx.names){
+      for(t in reduced.output.names){
+        for(f in factor.names){
+            dx.models[[x]][[t]][[f]] = anova_reduc(df, x, f, t)
+        }
+      }
+}
+
+dx.models %>% kable(format="pandoc")
+
+````
